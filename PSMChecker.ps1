@@ -357,7 +357,7 @@ function RunPSMInitFix {
     }
     if (CheckIfEqualInit -extuse $ext -parm $origin -path $correct) {
         $currentvalue = $ext.PSBase.InvokeGet($origin)
-        Write-Host "The ''$valuename'' is not configured correctly. The current value is: $currentvalue"  -ForegroundColor Red
+        Write-Host "The ''$valuename'' is not configured correctly for the user $user . The current value is: $currentvalue"  -ForegroundColor Red
         $global:issuescount++
         if (PromptForConfirmation) {
             Write-Host "Fixing the ''$valuename'' value."
@@ -373,7 +373,7 @@ function RunPSMInitFix {
         }
     }
     else {
-        Write-Host "The ''$valuename'' is configured correctly."  -ForegroundColor Green
+        Write-Host "The ''$valuename'' is configured correctly for the user $user ."  -ForegroundColor Green
 
     }
     
