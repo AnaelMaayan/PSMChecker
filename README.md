@@ -43,5 +43,6 @@ No modifications are required within the script itself, adjustments are only nee
 - [@Anael Maayan](https://www.linkedin.com/in/anael-maayan/)
 
 
-![Logo](https://www.cyberark.com/wp-content/uploads/2022/12/cyberark-logo-v2.svg)
+[![Logo](https://www.cyberark.com/wp-content/uploads/2022/12/cyberark-logo-v2.svg)](https://www.cyberark.com/)
+
 
