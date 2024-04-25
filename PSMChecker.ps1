@@ -20,7 +20,7 @@
 #              Change to $true to test pending Windows updates.
 #              Change to $false to skip the test for pending Windows updates.
 #
-# Version : 1.0.0
+# Version : 2.0.0
 # Created : April 2024
 # Cyber-Ark Software Ltd.
 # A.M
@@ -223,6 +223,7 @@ function PSMServiceLocalSystem {
             }
         }
     }
+    
 }
 
 #Checks if there is any pending windows updates and providing number of pending updates.
@@ -317,15 +318,14 @@ function IsUserAdmin {
     if ($DOMAIN_ACCOUNTS) {
         $principal = New-Object Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
         return $principal.IsInRole("Domain Admins") 
+        
     }
     else {
-        $user = [Security.Principal.WindowsIdentity]::GetCurrent()
         $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
         return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)   
     }
-    
-    
 }
+
 
 #Checks and fixing the Environment tab of the user on the AD or the local machine.
 function PSMinitSession {
@@ -620,12 +620,181 @@ function CheckAllowPolicy {
         }
     }
     if (!$allowed) {
-		$global:issuescount++
+        $global:issuescount++
         Write-Host "The user $user is not part of the ''$policyExplicitName'' policy." -ForegroundColor Red
         Write-Host "The policy path is: " -ForegroundColor Red
         Write-Host "Computer Configuration\Windows Settings\Security Settings\Local Policies\User Rights Assignment" -ForegroundColor Red
     }
 }
+
+#Run compare between brwoser and driver versions.
+function DriverAndBrowserVersion {
+    $chromeVersion = CheckBrowserVersion -browser "chrome"
+    $edgeVersion = CheckBrowserVersion -browser "edge"
+    if ($chromeVersion -ne "Not instlled") {
+        Write-Host "The version of Chrome is: $chromeVersion"
+        CheckDriverVersion -driverName "chromedriver.exe" -browserVersion $chromeVersion
+    }
+    else {
+        Write-Host "Chrome isn't installed"    
+    }
+
+    if ($edgeVersion -ne "Not instlled") {
+        Write-Host "The version of Edge is: $edgeVersion"
+        CheckDriverVersion -driverName "msedgedriver.exe" -browserVersion $edgeVersion 
+    }
+    else {
+        Write-Host "Edge isn't installed"    
+    }
+}
+#Check if Chrome\Edge installed and the version.
+function CheckBrowserVersion {
+    param(
+        $browser
+    )
+    if ($browser -eq "chrome") {
+        if ((Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe') -eq $true) {
+            $chromeVersion = (((Get-Item (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe').'(Default)').VersionInfo.ProductVersion) -split '\.')[0..2] -join '.'
+            return $chromeVersion
+        }
+        else {
+            return "Not instlled"
+        }
+    }
+    if ($browser -eq "edge") {
+        if ((Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe') -eq $true) {
+            $edgeVersion = (((Get-Item (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe').'(Default)').VersionInfo.ProductVersion) -split '\.')[0..2] -join '.'
+            return $edgeVersion
+        }
+        else {
+            return "Not instlled"
+
+        }
+    }
+}
+
+#Check if chromedriver\msedgedriver exist in the PSM Components folder and the version.
+function CheckDriverVersion {
+    param (
+        $driverName,
+        $browserVersion
+    )
+    if ((Test-Path "$PSM_COMPONENTS_FOLDER\$driverName") -eq $true) {
+        $versionString = & "$PSM_COMPONENTS_FOLDER\$driverName" --version
+        #Regular expression to find a version number in the format of x.y.z where x, y, and z are numbers.
+        $regexPattern = '\b\d+\.\d+\.\d+\b'
+        if ($versionString -match $regexPattern) {
+            $driverVersion = $matches[0]
+            Write-Host "The version of $driverName is: $driverVersion"
+            if ($driverVersion -eq $browserVersion) {
+                Write-Host "The $driverName version is matched to browser version." -ForegroundColor Green
+            }
+            else {
+                Write-Host "The $driverName version is not matched to browser version." -ForegroundColor Red      
+                $global:issuescount++      
+            }
+        }
+        else {
+            Write-Host "The $driverName version not found."  -ForegroundColor Red
+            $global:issuescount++
+        }
+    }
+    else {
+        Write-Host "The $driverName is not exist in the PSM Components folder."  -ForegroundColor Red
+        $global:issuescount++
+    }
+}
+
+#Check if UAC is enabled on the PSM and disable it.
+function UAC {
+    
+    $path = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
+    $value = "EnableLUA"
+    
+    if ((Get-ItemPropertyValue -Path $path -Name $value) -eq 1) {
+        $global:issuescount++
+        Write-Host "The UAC is enabled on the PSM." -ForegroundColor Red
+        if (PromptForConfirmation) {
+            Write-Host "Disabling the UAC."
+            Set-ItemProperty -Path $path -Name $value -Value 0
+            if ((Get-ItemPropertyValue -Path $path -Name $value) -eq 1) {
+                Write-Host "The UAC is still enabled on the PSM." -ForegroundColor Red
+            }
+            else {
+                $global:fixcount++
+                Write-Host "The UAC was disabled on the PSM." -ForegroundColor Green
+            }
+        }
+
+    }
+    else {
+        Write-Host "The UAC is disabled on the PSM." -ForegroundColor Green
+    }
+}
+
+#Run test on driver Bit
+function browser64Bit {
+    $chromeVersion = CheckBrowserVersion -browser "chrome"
+    $edgeVersion = CheckBrowserVersion -browser "edge"
+    if ($chromeVersion -ne "Not instlled") {
+        $browserPath = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe').'(default)'
+        $is32Bit = getBrowserBit -path $browserPath -process "chrome"
+        if ($is32Bit) {
+            Write-Host "The Chrome browser is 32-bit." -ForegroundColor Green
+        }
+        else {
+            $global:issuescount++
+            Write-Host "The Chrome browser is 64-bit - Not supported by CyberArk" -ForegroundColor Red
+        }
+    }
+    else {
+        Write-Host "Chrome isn't installed"    
+    }
+
+    if ($edgeVersion -ne "Not instlled") {
+        $browserPath = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe').'(default)'
+        $is32Bit = getBrowserBit -path $browserPath -process "msedge"
+        if ($is32Bit) {
+            Write-Host "The Edge browser is 32-bit." -ForegroundColor Green
+        }
+        else {
+            $global:issuescount++
+            Write-Host "The Edge browser is 64-bit - Not supported by CyberArk" -ForegroundColor Red
+        }
+    }
+    else {
+        Write-Host "Edge isn't installed"    
+    }
+}
+function getBrowserBit {
+    param (
+        $path,
+        $process
+    )
+    Get-Process -Name $process -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Sleep -Milliseconds 500
+    Add-Type -MemberDefinition @'
+[DllImport("kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.Winapi)]
+[return: MarshalAs(UnmanagedType.Bool)]
+public static extern bool IsWow64Process(
+    [In] System.IntPtr hProcess,
+    [Out, MarshalAs(UnmanagedType.Bool)] out bool wow64Process);
+'@ -Name NativeMethods -Namespace Kernel32
+    Start-Process $path -WindowStyle Hidden
+    Get-Process -name $process | Foreach {
+        $is32Bit = [int]0 
+        if ([Kernel32.NativeMethods]::IsWow64Process($_.Handle, [ref]$is32Bit)) { 
+            return $is32Bit 
+            Stop-Process -Name $process -Force
+        } 
+        else { 
+            Write-Host "Failed to get browser Bit" -ForegroundColor Red
+        }
+    }
+    Stop-Process -Name $process -Force
+    
+}
+
 
 #Strating the output to the log file.
 Start-Transcript -Path $LOG_FILE  | Out-Null
@@ -793,12 +962,30 @@ else {
             Write-Host ""
         }
     }
-	else {
-            Write-Host "Need to be connected with local Administrator" -ForegroundColor Red
-        }
+    else {
+        Write-Host "Need to be connected with local Administrator" -ForegroundColor Red
+    }
 
 }
+if ($CHECK_WEB_APPS) {
+    Write-Host ""
+    Write-Host "Checking Web Apps issues:" -ForegroundColor Yellow
+    Write-Host ""
 
+    Write-Host "Step 1: Web Driver is not updated." -ForegroundColor Yellow
+    DriverAndBrowserVersion
+    Write-Host ""
+
+    Write-Host "Step 2: UAC is enabled on the PSM." -ForegroundColor Yellow
+    UAC
+    Write-Host ""
+
+    Write-Host "Step 3: The installed browser version is 64-bit" -ForegroundColor Yellow
+    browser64Bit
+    Write-Host ""
+
+
+}
 Write-Host ""
 Write-Host "CyberArk PSMFix script ended successfully." -ForegroundColor Yellow
 Write-Host "The script was able to identify $issuescount issues and fix $fixcount issues." -ForegroundColor Yellow

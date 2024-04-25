@@ -21,7 +21,7 @@
 #              Change to $true to check pending Windows updates.
 #              Change to $false to skip the testing process for pending Windows updates.
 #
-# Version : 1.0.0
+# Version : 2.0.0
 # Created : April 2024
 # Cyber-Ark Software Ltd.
 # A.M
@@ -35,3 +35,4 @@ $PSM_CONNECT_USER = "PSMConnect"
 $PSM_ADMIN_CONNECT_USER = "PSMAdminConnect"
 $PSM_COMPONENTS_FOLDER = "C:\Program Files (x86)\CyberArk\PSM\Components"
 $WINDOWS_UPDATES_CHECK = $false
+$CHECK_WEB_APPS = $true
