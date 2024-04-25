@@ -505,22 +505,22 @@ function RegistryPathsFix {
     $path = Get-ItemPropertyValue -Path $KeyPath -Name $value
     if ($path -ne $CorrectPath) {
         $global:issuescount++
-        Write-Host "The value of Path in the registry is wrong. Current value: $path" -ForegroundColor Red
+        Write-Host "The value of $value in the registry is wrong. Current value: $path" -ForegroundColor Red
         if (PromptForConfirmation) {
             Write-Host "Fixing path value."
             Set-ItemProperty -Path $KeyPath -Name $value -Value $CorrectPath
             $path = Get-ItemPropertyValue -Path $KeyPath -Name $value
             if ($path -eq $CorrectPath) {
                 $global:fixcount++
-                Write-Host "The value of Path in the registry was fixed." -ForegroundColor Green
+                Write-Host "The value of $value in the registry was fixed." -ForegroundColor Green
             }
             else {
-                Write-Host "Unable to fix the value of Path in the registry." -ForegroundColor Red
+                Write-Host "Unable to fix the value of $value in the registry." -ForegroundColor Red
             }
         }
     }
     else {
-        Write-Host "The value of Path in the registry is correct." -ForegroundColor Green
+        Write-Host "The value of $value in the registry is correct." -ForegroundColor Green
     }
 } 
 
