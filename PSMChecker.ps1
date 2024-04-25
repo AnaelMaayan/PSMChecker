@@ -795,6 +795,12 @@ public static extern bool IsWow64Process(
     
 }
 
+function webDispatcherVersion {
+    
+    $dispatcherVer = (Get-Item "$PSM_COMPONENTS_FOLDER\CyberArk.PSM.WebAppDispatcher.exe").VersionInfo.ProductVersion
+    Write-Host "The Web Dispatcher version is: $dispatcherVer"
+    Write-Host "Please update the Dispatcher if there is a newer version."
+}
 
 #Strating the output to the log file.
 Start-Transcript -Path $LOG_FILE  | Out-Null
@@ -982,6 +988,10 @@ if ($CHECK_WEB_APPS) {
 
     Write-Host "Step 3: The installed browser version is 64-bit" -ForegroundColor Yellow
     browser64Bit
+    Write-Host ""
+
+    Write-Host "Step 4: The Web Dispatcher needs to be updated." -ForegroundColor Yellow
+    webDispatcherVersion
     Write-Host ""
 
 
