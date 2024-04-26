@@ -2,23 +2,6 @@
 #                       PSMChecker POWERSHELL SCRIPT
 #                    -------------------------------
 # General : This script helps identifying and fixing PSM common issues.
-#           Parameters that may be modified:
-#           1) $DOMAIN_ACCOUNTS: 
-#              Change to $true if using domain PSMConnect and PSMAdminConnect.
-#              Change to $false if using local PSMConnect and PSMAdminConnect.
-#
-#	    	2) $PSM_CONNECT_USER:
-#	           Insert the PSMConnect username without Domain name.
-#
-#           3) $PSM_ADMIN_CONNECT_USER: 
-#	           Insert the PSMAdminConnect username without Domain name.
-#
-#           4) $PSM_COMPONENTS_FOLDER
-#	           Insert the path to the Components folder of the PSM.
-#
-#           5) $WINDOWS_UPDATES_CHECK
-#              Change to $true to test pending Windows updates.
-#              Change to $false to skip the test for pending Windows updates.
 #
 # Version : 1.0.0
 # Created : April 2024
@@ -630,173 +613,124 @@ function CheckAllowPolicy {
 #Strating the output to the log file.
 Start-Transcript -Path $LOG_FILE  | Out-Null
 
-#The running process of Domain accounts.
+#The running process.
 if ($DOMAIN_ACCOUNTS) {
 
     #Installing the Active Directory module for Windows PowerShell.
     Install-WindowsFeature -Name "RSAT-AD-PowerShell" -IncludeAllSubFeature | Out-Null
-
     write-host ""
     $IsAdmin = IsUserAdmin
     Write-Host "Connected with Domain Administrator:$IsAdmin"  -ForegroundColor Yellow
-    if ($IsAdmin) {
-        write-host ""
-        Write-Host "The configured PSM users are domain users." -ForegroundColor Black -BackgroundColor White
-        Write-Host "The configured PSMConnect user name is: $PSM_CONNECT_USER." -ForegroundColor Black -BackgroundColor White
-        Write-Host "The configured PSMAdminConnect user name is: $PSM_ADMIN_CONNECT_USER." -ForegroundColor Black -BackgroundColor White
-        write-host ""
-
-        Write-Host "Step 1: PSM users are locked or disabled." -ForegroundColor Yellow
-        RunDisabledOrLockedOut -user $PSM_CONNECT_USER
-        RunDisabledOrLockedOut -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-
-        Write-Host "Step 2: PSM users are set to change password on next logon." -ForegroundColor Yellow
-        ChangeOnNextLogon -user $PSM_CONNECT_USER
-        ChangeOnNextLogon -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-
-        Write-Host "Step 3: PSM service is not set to run as Local System user." -ForegroundColor Yellow
-        PSMServiceLocalSystem
-        Write-Host ""
-
-        Write-Host "Step 4: PSM service is down." -ForegroundColor Yellow
-        PSMService
-        Write-Host ""
-
-        Write-Host "Step 5: PSM users has no ''Log On To'' permissions." -ForegroundColor Yellow
-        LogOnTo -user $PSM_CONNECT_USER
-        LogOnTo -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-
-        Write-Host "Step 6: PSM users are not part of the Remote Desktop Users local group." -ForegroundColor Yellow
-        RDUGroup -user $PSM_CONNECT_USER
-        RDUGroup -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-
-        Write-Host "Step 7: The Environment tab isn't configured correctly." -ForegroundColor Yellow
-        PSMinitSession -user $PSM_CONNECT_USER
-        PSMinitSession -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-
-        Write-Host "Step 8: The PSM users doesn't have permissions on the Components folder." -ForegroundColor Yellow
-        FolderPermissions -user $PSM_CONNECT_USER
-        FolderPermissions -user $PSM_ADMIN_CONNECT_USER
-        FolderPermissions -user $PSM_SHADOW_USERS_GROUP
-        Write-Host ""
-
-        Write-Host "Step 9: NLA is enabled on the PSM." -ForegroundColor Yellow
-        NLA
-        Write-Host ""
-
-        Write-Host "Step 10: TSAppAllowList registry keys are not pointing to the correct location for the PSMInitSession.exe." -ForegroundColor Yellow
-        RegistryTSAppAllowList
-        Write-Host ""
-
-        Write-Host "Step 11: There is ''Start a program on connection'' GPO applied on the PSM." -ForegroundColor Yellow
-        CheckGPO
-        Write-Host ""
-
-        Write-Host "Step 12: The PSM users are not part of the ''Allow log on through Remote Desktop Services'' policy." -ForegroundColor Yellow
-        AllowLogonPolicy -user $PSM_CONNECT_USER
-        AllowLogonPolicy -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-
-        Write-Host "Step 13: The PSM Shadow Users group are not part of the ''Allow log on locally'' policy." -ForegroundColor Yellow
-        AllowLogonPolicy -user $PSM_SHADOW_USERS_GROUP
-        Write-Host ""
-
-        if ($WINDOWS_UPDATES_CHECK) {
-            Write-Host "Step 14: PSM server has pending Windows updates." -ForegroundColor Yellow
-            WindowsUpdates
-            Write-Host ""
-        }
-        
-    }
-    else {
-        Write-Host "Need to be connected with Domain Administrator" -ForegroundColor Red
-    }
-    
 }
-
-#The running process of Local accounts.
 else {
     $IsAdmin = IsUserAdmin
     write-host ""
     Write-Host "Connected with Local Administrator:$IsAdmin"  -ForegroundColor Yellow
-    if ($IsAdmin) {
+}
     
-        write-host ""
-        Write-Host "The configured PSM users are local users." -ForegroundColor Black -BackgroundColor White
-        Write-Host "The configured PSMConnect user name is: $PSM_CONNECT_USER." -ForegroundColor Black -BackgroundColor White
-        Write-Host "The configured PSMAdminConnect user name is: $PSM_ADMIN_CONNECT_USER." -ForegroundColor Black -BackgroundColor White
-        write-host ""
-
-        Write-Host "Step 1: PSM users are locked or disabled." -ForegroundColor Yellow
-        RunDisabledOrLockedOut -user $PSM_CONNECT_USER
-        RunDisabledOrLockedOut -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-
-        Write-Host "Step 2: PSM users are set to change password on next logon." -ForegroundColor Yellow
-        ChangeOnNextLogon -user $PSM_CONNECT_USER
-        ChangeOnNextLogon -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-    
-        Write-Host "Step 3: PSM service is not set to run as Local System user." -ForegroundColor Yellow
-        PSMServiceLocalSystem
-        Write-Host ""
-
-        Write-Host "Step 4: PSM service is down." -ForegroundColor Yellow
-        PSMService
-        Write-Host ""
-
-        Write-Host "Step 5: PSM users are not part of the Remote Desktop Users local group." -ForegroundColor Yellow
-        RDUGroup -user $PSM_CONNECT_USER
-        RDUGroup -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-
-        Write-Host "Step 6: The Environment tab isn't configured correctly." -ForegroundColor Yellow
-        PSMinitSession -user $PSM_CONNECT_USER
-        PSMinitSession -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-
-        Write-Host "Step 7: The PSM users doesn't have permissions on the Components folder." -ForegroundColor Yellow
-        FolderPermissions -user $PSM_CONNECT_USER
-        FolderPermissions -user $PSM_ADMIN_CONNECT_USER
-        FolderPermissions -user $PSM_SHADOW_USERS_GROUP
-        Write-Host ""
-
-        Write-Host "Step 8: NLA is enabled on the PSM." -ForegroundColor Yellow
-        NLA
-        Write-Host ""
-
-        Write-Host "Step 9: TSAppAllowList registry keys are not pointing to the correct location for the PSMInitSession.exe." -ForegroundColor Yellow
-        RegistryTSAppAllowList
-        Write-Host ""
-
-        Write-Host "Step 10: There is no ''Start a program on connection'' GPO applied on the PSM." -ForegroundColor Yellow
-        CheckGPO
-        Write-Host ""
-            
-        Write-Host "Step 11: The PSM users are not part of the ''Allow log on through Remote Desktop Services'' policy." -ForegroundColor Yellow
-        AllowLogonPolicy -user $PSM_CONNECT_USER
-        AllowLogonPolicy -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-
-        Write-Host "Step 12: The PSM Shadow Users group are not part of the ''Allow log on locally'' policy." -ForegroundColor Yellow
-        AllowLogonPolicy -user $PSM_SHADOW_USERS_GROUP
-        Write-Host ""
-
-        if ($WINDOWS_UPDATES_CHECK) {
-            Write-Host "Step 13: PSM server has pending Windows updates." -ForegroundColor Yellow
-            WindowsUpdates
-            Write-Host ""
-        }
+if ($IsAdmin) {
+    $stepsCounter = 0
+    write-host ""
+    if ($DOMAIN_ACCOUNTS) {
+        Write-Host "The configured PSM users are domain users." -ForegroundColor Black -BackgroundColor White
     }
-	else {
-            Write-Host "Need to be connected with local Administrator" -ForegroundColor Red
-        }
+    else {
+        Write-Host "The configured PSM users are local users." -ForegroundColor Black -BackgroundColor White
+    }
+    Write-Host "The configured PSMConnect user name is: $PSM_CONNECT_USER." -ForegroundColor Black -BackgroundColor White
+    Write-Host "The configured PSMAdminConnect user name is: $PSM_ADMIN_CONNECT_USER." -ForegroundColor Black -BackgroundColor White
+    write-host ""
 
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) PSM users are locked or disabled." -ForegroundColor Yellow
+    RunDisabledOrLockedOut -user $PSM_CONNECT_USER
+    RunDisabledOrLockedOut -user $PSM_ADMIN_CONNECT_USER
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) PSM users are set to change password on next logon." -ForegroundColor Yellow
+    ChangeOnNextLogon -user $PSM_CONNECT_USER
+    ChangeOnNextLogon -user $PSM_ADMIN_CONNECT_USER
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) PSM service is not set to run as Local System user." -ForegroundColor Yellow
+    PSMServiceLocalSystem
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) PSM service is down." -ForegroundColor Yellow
+    PSMService
+    Write-Host ""
+
+    if ($DOMAIN_ACCOUNTS) {
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) PSM users has no ''Log On To'' permissions." -ForegroundColor Yellow
+        LogOnTo -user $PSM_CONNECT_USER
+        LogOnTo -user $PSM_ADMIN_CONNECT_USER
+        Write-Host ""
+    }
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) PSM users are not part of the Remote Desktop Users local group." -ForegroundColor Yellow
+    RDUGroup -user $PSM_CONNECT_USER
+    RDUGroup -user $PSM_ADMIN_CONNECT_USER
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) The Environment tab isn't configured correctly." -ForegroundColor Yellow
+    PSMinitSession -user $PSM_CONNECT_USER
+    PSMinitSession -user $PSM_ADMIN_CONNECT_USER
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) The PSM users doesn't have permissions on the Components folder." -ForegroundColor Yellow
+    FolderPermissions -user $PSM_CONNECT_USER
+    FolderPermissions -user $PSM_ADMIN_CONNECT_USER
+    FolderPermissions -user $PSM_SHADOW_USERS_GROUP
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) NLA is enabled on the PSM." -ForegroundColor Yellow
+    NLA
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) TSAppAllowList registry keys are not pointing to the correct location for the PSMInitSession.exe." -ForegroundColor Yellow
+    RegistryTSAppAllowList
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) There is ''Start a program on connection'' GPO applied on the PSM." -ForegroundColor Yellow
+    CheckGPO
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) The PSM users are not part of the ''Allow log on through Remote Desktop Services'' policy." -ForegroundColor Yellow
+    AllowLogonPolicy -user $PSM_CONNECT_USER
+    AllowLogonPolicy -user $PSM_ADMIN_CONNECT_USER
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) The PSM Shadow Users group are not part of the ''Allow log on locally'' policy." -ForegroundColor Yellow
+    AllowLogonPolicy -user $PSM_SHADOW_USERS_GROUP
+    Write-Host ""
+
+    if ($WINDOWS_UPDATES_CHECK) {
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) PSM server has pending Windows updates." -ForegroundColor Yellow
+        WindowsUpdates
+        Write-Host ""
+    }
+
+}
+else {
+    if ($DOMAIN_ACCOUNTS) {
+        Write-Host "Need to be connected with Domain Administrator" -ForegroundColor Red
+    }
+    else {
+        Write-Host "Need to be connected with local Administrator" -ForegroundColor Red    
+    }
 }
 
 Write-Host ""
