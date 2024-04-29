@@ -610,6 +610,52 @@ function CheckAllowPolicy {
     }
 }
 
+#Runs the tests for RDP-TCP registry keys values
+function RDPTCPRegistry {
+    $regPath = "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp"
+    $keys = "fInheritAutoLogon" ,"fInheritInitialProgram" ,"fQueryUserConfigFromDC" , "fPromptForPassword"
+    for ($i = 0; $i -lt 4; $i++) {
+        $value = 1
+        if ($i -eq 3) {
+            $value = 0
+        }
+        RDPTCPCheckAndFix -regPath $regPath -key $keys[$i] -value $value
+        
+    }
+
+    
+}
+
+#Checking and fixing the RDP-TCP registry keys values
+function RDPTCPCheckAndFix {
+    param (
+        $regPath,
+        $key,
+        $value
+    )
+    $currentvalue = Get-ItemPropertyValue -Path $regPath -Name $key
+    if ($currentvalue -ne $value) {
+        $global:issuescount++
+        Write-Host "The value of $key is not configured as needed." -ForegroundColor Red
+        if (PromptForConfirmation) {
+            Write-Host "Fixing value."
+            Set-ItemProperty -Path $regPath -Name $key -Value $value
+            $currentvalue = Get-ItemPropertyValue -Path $regPath -Name $key
+            if ($currentvalue -ne $value) {
+                Write-Host "The value of $key is still not configured as needed." -ForegroundColor Red
+            }
+            else {
+                $global:fixcount++
+                Write-Host "The value of $key was configured as needed." -ForegroundColor Green
+            }
+        }
+    }
+    else {
+        Write-Host "The value of $key is configured as needed." -ForegroundColor Green
+    }
+    
+}
+
 #Run compare between brwoser and driver versions.
 function DriverAndBrowserVersion {
     $chromeVersion = CheckBrowserVersion -browser "chrome"
@@ -716,7 +762,7 @@ function UAC {
 }
 
 #Run test on driver Bit
-function browser64Bit {
+function Browser64Bit {
     $chromeVersion = CheckBrowserVersion -browser "chrome"
     $edgeVersion = CheckBrowserVersion -browser "edge"
     if ($chromeVersion -ne "Not instlled") {
@@ -891,6 +937,11 @@ if ($IsAdmin) {
     AllowLogonPolicy -user $PSM_SHADOW_USERS_GROUP
     Write-Host ""
 
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) The registry keys of RDP-TCP isn't configured as needed." -ForegroundColor Yellow
+    RDPTCPRegistry
+    Write-Host ""
+
     if ($WINDOWS_UPDATES_CHECK) {
         $stepsCounter++
         Write-Host "Step $stepsCounter) PSM server has pending Windows updates." -ForegroundColor Yellow
@@ -914,8 +965,8 @@ if ($IsAdmin) {
         Write-Host ""
 
         $stepsCounter++
-        Write-Host "Step $stepsCounter) The installed browser version is 64-bit" -ForegroundColor Yellow
-        browser64Bit
+        Write-Host "Step $stepsCounter) The installed browser version is 64-bit." -ForegroundColor Yellow
+        Browser64Bit
         Write-Host ""
 
         $stepsCounter++
