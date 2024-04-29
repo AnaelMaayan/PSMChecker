@@ -726,10 +726,10 @@ if ($IsAdmin) {
 }
 else {
     if ($DOMAIN_ACCOUNTS) {
-        Write-Host "Need to be connected with Domain Administrator" -ForegroundColor Red
+        Write-Host "Need to be connected with Domain Administrator." -ForegroundColor Red
     }
     else {
-        Write-Host "Need to be connected with local Administrator" -ForegroundColor Red    
+        Write-Host "Need to be connected with local Administrator." -ForegroundColor Red    
     }
 }
 
