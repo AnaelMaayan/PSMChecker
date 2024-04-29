@@ -386,13 +386,13 @@ function FolderPermissions {
         $computer = $env:COMPUTERNAME
         $userprop = "$computer\$user"
     }
-    if (CheckPermissions -user $userprop) {
+    if (CheckPermissions -user $userprop -path $PSM_COMPONENTS_FOLDER) {
         Write-Host "The user $userprop doesn't have the right permissions on the Components folder." -ForegroundColor Red
         $global:issuescount++
         if (PromptForConfirmation) {
             Write-Host "Fixing permissions."
-            PermissionsFix -user $userprop
-            if (CheckPermissions -user $userprop) {
+            PermissionsFix -user $userprop -path $PSM_COMPONENTS_FOLDER
+            if (CheckPermissions -user $userprop -path $PSM_COMPONENTS_FOLDER) {
                 Write-Host "The permissions was not granted for user $userprop." -ForegroundColor Red
 
             }
@@ -410,10 +410,11 @@ function FolderPermissions {
 #Checking if the right permissions are granted and denied.
 function CheckPermissions {
     param (
-        $user
+        $user,
+        $path
     )
-    $acl1 = (get-acl $PSM_COMPONENTS_FOLDER).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq ReadAndExecute, Synchronize | Where-Object -FilterScript { $_.AccessControlType -eq 'Allow' }
-    $acl2 = (get-acl $PSM_COMPONENTS_FOLDER).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq DeleteSubdirectoriesAndFiles, Write, Delete, ChangePermissions, TakeOwnership | Where-Object -FilterScript { $_.AccessControlType -eq 'Deny' }
+    $acl1 = (get-acl $path).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq ReadAndExecute, Synchronize | Where-Object -FilterScript { $_.AccessControlType -eq 'Allow' }
+    $acl2 = (get-acl $path).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq DeleteSubdirectoriesAndFiles, Write, Delete, ChangePermissions, TakeOwnership | Where-Object -FilterScript { $_.AccessControlType -eq 'Deny' }
     return ($acl1 -eq $null -and $acl2 -eq $null) 
     
 }
@@ -421,22 +422,23 @@ function CheckPermissions {
 #Granting and denying the folder permissions.
 function PermissionsFix {
     param (
-        $user
+        $user,
+        $path
     )
-    $acl = Get-ACL $PSM_COMPONENTS_FOLDER
+    $acl = Get-ACL $path
     $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "FullControl", "ContainerInherit,ObjectInherit", "None", "Deny")
     $acl.RemoveAccessRule($ace)  | Out-Null
-    Set-ACL -Path $PSM_COMPONENTS_FOLDER -AclObject $acl
+    Set-ACL -Path $path -AclObject $acl
     $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
     $acl.RemoveAccessRule($ace)  | Out-Null
-    Set-ACL -Path $PSM_COMPONENTS_FOLDER -AclObject $acl
+    Set-ACL -Path $path -AclObject $acl
     $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "DeleteSubdirectoriesAndFiles,Write,Delete,ChangePermissions,TakeOwnership", "ContainerInherit,ObjectInherit", "None", "Deny")
     $acl.AddAccessRule($ace)
-    Set-ACL -Path $PSM_COMPONENTS_FOLDER -AclObject $acl
-    $acl = Get-ACL $PSM_COMPONENTS_FOLDER
+    Set-ACL -Path $path -AclObject $acl
+    $acl = Get-ACL $path
     $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "ReadAndExecute, Synchronize , ReadPermissions", "ContainerInherit,ObjectInherit", "None", "Allow")
     $acl.AddAccessRule($ace)
-    Set-ACL -Path $PSM_COMPONENTS_FOLDER -AclObject $acl
+    Set-ACL -Path $path -AclObject $acl
 
     
 }
@@ -760,7 +762,7 @@ function UAC {
     }
 }
 
-#Run test on driver Bit
+#Run test on driver Bit.
 function Browser64Bit {
     $chromeVersion = CheckBrowserVersion -browser "chrome"
     $edgeVersion = CheckBrowserVersion -browser "edge"
@@ -795,7 +797,7 @@ function Browser64Bit {
     }
 }
 
-#Checks the browser Bit
+#Checks the browser Bit.
 function getBrowserBit {
     param (
         $path,
@@ -825,12 +827,29 @@ public static extern bool IsWow64Process(
     
 }
 
-#Checks the WebDispatcher version
-function webDispatcherVersion {
+#Checks the WebDispatcher version.
+function WebDispatcherVersion {
     
     $dispatcherVer = (Get-Item "$PSM_COMPONENTS_FOLDER\CyberArk.PSM.WebAppDispatcher.exe").VersionInfo.ProductVersion
     Write-Host "The Web Dispatcher version is: $dispatcherVer"
     Write-Host "Please update the Dispatcher if there is a newer version."
+}
+
+#Checkes if the PSMHardening.ps1 was run without supporting Web Apps.
+function WebAppHardeningFalse {
+
+    $computer = $env:COMPUTERNAME
+    $userprop = "$computer\$PSM_SHADOW_USERS_GROUP" 
+    $IE86 = "C:\Program Files (x86)\Internet Explorer\iexplore.exe"
+    $IE64 = "C:\Program Files\internet explorer\iexplore.exe"
+    if ((CheckPermissions -user $userprop -path $IE86) -or (CheckPermissions -user $userprop -path $IE64)) {
+        Write-Host "The value for the SUPPORT_WEB_APPLICATIONS on the Hardening is set to false." -ForegroundColor Red
+        Write-Host "Please set the SUPPORT_WEB_APPLICATIONS value to true on the PSMHardening.ps1 script on the Hardening folder and run the Hardening script." -ForegroundColor Red
+        $global:issuescount++
+    }
+    else {
+        Write-Host "The value for the SUPPORT_WEB_APPLICATIONS on the Hardening is set to true." -ForegroundColor Green
+    }
 }
 
 #Strating the output to the log file.
@@ -973,7 +992,12 @@ if ($IsAdmin) {
 
         $stepsCounter++
         Write-Host "Step $stepsCounter) The Web Dispatcher needs to be updated." -ForegroundColor Yellow
-        webDispatcherVersion
+        WebDispatcherVersion
+        Write-Host ""
+
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) The Hardening is set to not support Web Apps." -ForegroundColor Yellow
+        WebAppHardeningFalse
         Write-Host ""
     }
    

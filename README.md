@@ -27,6 +27,7 @@
 - Check if UAC is enabled on the PSM - notify and fix.
 - Check if the installed browser version is 64-bit (Chrome & Edge) - notify only.
 - Check the version of the Web Dispatcher - notify and suggests downloading a newer version if released.
+- Check if the Hardening is set to not support Web Apps - notify only.
 
 
 
