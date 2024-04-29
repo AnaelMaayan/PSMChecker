@@ -29,6 +29,7 @@ $global:issuescount = 0
 # Functions
 ###########################################################################################
 
+#Asks if the user willing to fix the identified issue.
 function PromptForConfirmation {
     $input = Read-Host "Would you like to fix the identified issue? Yes/No"
     switch ($input) {
@@ -622,8 +623,6 @@ function RDPTCPRegistry {
         RDPTCPCheckAndFix -regPath $regPath -key $keys[$i] -value $value
         
     }
-
-    
 }
 
 #Checking and fixing the RDP-TCP registry keys values
@@ -795,6 +794,8 @@ function Browser64Bit {
         Write-Host "Edge isn't installed"    
     }
 }
+
+#Checks the browser Bit
 function getBrowserBit {
     param (
         $path,
@@ -824,6 +825,7 @@ public static extern bool IsWow64Process(
     
 }
 
+#Checks the WebDispatcher version
 function webDispatcherVersion {
     
     $dispatcherVer = (Get-Item "$PSM_COMPONENTS_FOLDER\CyberArk.PSM.WebAppDispatcher.exe").VersionInfo.ProductVersion
