@@ -52,7 +52,7 @@ function DisabledOrLockedOut {
         $user
     )
     if ($DOMAIN_ACCOUNTS) {
-    ((Get-ADUser -Identity $user).Enabled -eq $false -or (Get-ADUser -Identity $user).LockedOut -eq $true)
+    ((Get-ADUser -Identity $user).Enabled -eq $false -or (Get-ADUser -Identity $user -Properties * | Select-Object -ExpandProperty LockedOut) -eq $true)
     }
     else {
         ((Get-LocalUser -Name $user).Enabled -eq $false -or (Get-LocalUser -Name $user).LockoutEnabled -eq $true)
