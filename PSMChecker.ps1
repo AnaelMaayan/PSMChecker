@@ -161,8 +161,12 @@ function FixChangeOnNextLogon {
 #Checks if the PSM service is running.
 #If not - runs the service.
 function PSMService {
-    $serviceName = "CyberArk Privileged Session Manager"
-
+    If (Get-Service -Name "Cyber-Ark Privileged Session Manager" -ErrorAction SilentlyContinue) {
+        $serviceName = "Cyber-Ark Privileged Session Manager"
+    }
+    If (Get-Service -Name "CyberArk Privileged Session Manager" -ErrorAction SilentlyContinue) {
+        $serviceName = "CyberArk Privileged Session Manager"
+    }
     if ((Get-Service -Name $serviceName).Status -ne "Running") {
         Write-Host "The service '$serviceName' is not running." -ForegroundColor Red
         $global:issuescount++
@@ -185,7 +189,12 @@ function PSMService {
 #Checks if the service set to Log on with an account
 #If it does then changing it to "Local System account" and runs the service.
 function PSMServiceLocalSystem {
-    $serviceName = "CyberArk Privileged Session Manager"
+    If (Get-Service -Name "Cyber-Ark Privileged Session Manager" -ErrorAction SilentlyContinue) {
+        $serviceName = "Cyber-Ark Privileged Session Manager"
+    }
+    If (Get-Service -Name "CyberArk Privileged Session Manager" -ErrorAction SilentlyContinue) {
+        $serviceName = "CyberArk Privileged Session Manager"
+    }
     $currentLogonAccount = (Get-WmiObject -Class Win32_Service -Filter "Name='$serviceName'").StartName
 
     if ($currentLogonAccount -eq "LocalSystem") {
