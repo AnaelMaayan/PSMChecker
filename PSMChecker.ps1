@@ -16,6 +16,7 @@
 . .\PSMCheckerConfig.ps1
 $PSM_SHADOW_USERS_GROUP = "PSMShadowUsers"
 $LOG_FILE = ".\Logs\PSMChecker-$(Get-Date -Format "dd-MM-yyyy - HH-mm").log"
+$ARTICLES_TEXT_FILE = ".\Recommended Articles - $(Get-Date -Format "dd-MM-yyyy - HH-mm").txt"
 ########################################################################################################################
 
 
@@ -625,7 +626,7 @@ function CheckAllowPolicy {
 #Runs the tests for RDP-TCP registry keys values
 function RDPTCPRegistry {
     $regPath = "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp"
-    $keys = "fInheritAutoLogon" ,"fInheritInitialProgram" ,"fQueryUserConfigFromDC" , "fPromptForPassword"
+    $keys = "fInheritAutoLogon" , "fInheritInitialProgram" , "fQueryUserConfigFromDC" , "fPromptForPassword"
     for ($i = 0; $i -lt 4; $i++) {
         $value = 1
         if ($i -eq 3) {
@@ -729,7 +730,11 @@ function CheckDriverVersion {
                 Write-Host "The $driverName version is matched to browser version." -ForegroundColor Green
             }
             else {
-                Write-Host "The $driverName version is not matched to browser version." -ForegroundColor Red      
+                Write-Host "The $driverName version is not matched to browser version." -ForegroundColor Red
+                Write-Host "Please update the $driverName driver." -ForegroundColor Red
+                Write-Host "Link to an article about how to update the driver is on Recommended Articles.txt file." -ForegroundColor Yellow
+                "How to download or update browser (Chrome\Edge) driver:`nhttps://cyberark.my.site.com/s/article/How-to-download-or-update-browser-Chrome-Edge-driver`n" | Out-File $ARTICLES_TEXT_FILE -Append
+      
                 $global:issuescount++      
             }
         }
@@ -783,7 +788,10 @@ function Browser64Bit {
         }
         else {
             $global:issuescount++
-            Write-Host "The Chrome browser is 64-bit - Not supported by CyberArk" -ForegroundColor Red
+            Write-Host "The Chrome browser is 64-bit - Not supported by CyberArk." -ForegroundColor Red
+            Write-Host "Please download 32-bit Chrome browser." -ForegroundColor Red
+            Write-Host "Download link for Google Chrome is on Recommended Articles.txt file." -ForegroundColor Yellow
+            "Download link for Google Chrome (32-bit):`nhttps://chromeenterprise.google/intl/en_US/download`n" | Out-File $ARTICLES_TEXT_FILE -Append
         }
     }
     else {
@@ -798,7 +806,10 @@ function Browser64Bit {
         }
         else {
             $global:issuescount++
-            Write-Host "The Edge browser is 64-bit - Not supported by CyberArk" -ForegroundColor Red
+            Write-Host "The Edge browser is 64-bit - Not supported by CyberArk." -ForegroundColor Red
+            Write-Host "Please download 32-bit Edge browser." -ForegroundColor Red
+            Write-Host "Download link for Microsoft Edge is on Recommended Articles.txt file." -ForegroundColor Yellow
+            "Download link for Microsoft Edge (32-bit):`nhttps://www.microsoft.com/en-us/edge/business/download?form=MA13FJ`n" | Out-File $ARTICLES_TEXT_FILE -Append
         }
     }
     else {
@@ -842,6 +853,10 @@ function WebDispatcherVersion {
     $dispatcherVer = (Get-Item "$PSM_COMPONENTS_FOLDER\CyberArk.PSM.WebAppDispatcher.exe").VersionInfo.ProductVersion
     Write-Host "The Web Dispatcher version is: $dispatcherVer"
     Write-Host "Please update the Dispatcher if there is a newer version."
+    Write-Host "Link to the download of the latest Dispatcher is on Recommended Articles.txt file." -ForegroundColor Yellow
+    "Latest Web Dispatcher download:`nhttps://cyberark.my.site.com/mplace/s/#a3550000000EiCMAA0-a3950000000jjUwAAI`n" | Out-File $ARTICLES_TEXT_FILE -Append
+
+
 }
 
 #Checkes if the PSMHardening.ps1 was run without supporting Web Apps.
