@@ -497,7 +497,12 @@ function RegistryPathsFix {
         $value
     )
     $KeyPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Terminal Server\TSAppAllowList\Applications\PSMInitSession"
-    $path = Get-ItemPropertyValue -Path $KeyPath -Name $value
+    try {
+        $path = Get-ItemPropertyValue -Path $KeyPath -Name $value 
+    }
+    catch {
+        $path = "The key doesn't exist."
+    }
     if ($path -ne $CorrectPath) {
         $global:issuescount++
         Write-Host "The value of $value in the registry is wrong. Current value: $path" -ForegroundColor Red
