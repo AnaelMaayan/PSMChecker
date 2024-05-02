@@ -583,7 +583,7 @@ function AllowLogonPolicy {
         $user
     )
 
-    if ($DOMAIN_ACCOUNTS -and $user -ne $PSM_SHADOW_USERS_GROUP) {
+    if ($DOMAIN_ACCOUNTS -and $user) {
         $userprop = (Get-AdUser -Identity $user | Select SID) -replace '@{SID=', '*' -replace '}', ''
         CheckAllowPolicy -user $user -sid $userprop  
     }
@@ -597,14 +597,9 @@ function CheckAllowPolicy {
         $user,
         $sid
     )
-    if ($user -eq $PSM_SHADOW_USERS_GROUP) {
-        $policy = "SeInteractiveLogonRight"
-        $policyExplicitName = "Allow log on locally"
-    }
-    else {
-        $policy = "SeRemoteInteractiveLogonRight"
-        $policyExplicitName = "Allow log on through Remote Desktop Services"
-    }
+   
+    $policy = "SeRemoteInteractiveLogonRight"
+    $policyExplicitName = "Allow log on through Remote Desktop Services"
     $temp = New-TemporaryFile
     $allowed = $false
     secedit /export /cfg "$temp" /areas user_rights | out-null
@@ -724,11 +719,6 @@ if ($IsAdmin) {
     Write-Host "Step $stepsCounter) Checking if the PSM users are not part of the ''Allow log on through Remote Desktop Services'' policy." -ForegroundColor Yellow
     AllowLogonPolicy -user $PSM_CONNECT_USER
     AllowLogonPolicy -user $PSM_ADMIN_CONNECT_USER
-    Write-Host ""
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the PSM Shadow Users group are not part of the ''Allow log on locally'' policy." -ForegroundColor Yellow
-    AllowLogonPolicy -user $PSM_SHADOW_USERS_GROUP
     Write-Host ""
 
     if ($WINDOWS_UPDATES_CHECK) {
