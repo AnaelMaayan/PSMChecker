@@ -18,7 +18,6 @@
 - Check if the TSAppAllowList registry keys are not pointing to the correct location for the PSMInitSession.exe (Path and ShortPath) - notify and fix.
 - Check if there is "Start a program on connection" GPO on the PSM - notify only.
 - Check if the PSM users are not part of the "Allow log on through Remote Desktop Services" policy - notify only.
-- Check if the PSM Shadow Users group are not part of the "Allow log on locally" policy - notify only.
 - Check if the RDP-TCP registry keys values configured as needed - notify and fix.
 - Check if the PSM server has pending Windows updates - notify only, needs to be enabled.
 
