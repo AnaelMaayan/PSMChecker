@@ -1005,7 +1005,7 @@ if ($IsAdmin) {
         Write-Host ""
 
         $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the installed browser version is 64-bit." -ForegroundColor Yellow
+        Write-Host "Step $stepsCounter) Checking if the installed browser version is 32-bit." -ForegroundColor Yellow
         Browser64Bit
         Write-Host ""
 
