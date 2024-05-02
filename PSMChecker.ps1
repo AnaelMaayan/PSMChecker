@@ -577,7 +577,7 @@ function TestRegistryValue {
     }
 }
 
-#Check if the users is in Allow log on through Remote Desktop Services or Allow log on locally under User Rights Assignment.
+#Check if the users is in Allow log on through Remote Desktop Services under User Rights Assignment.
 function AllowLogonPolicy {
     param (
         $user
@@ -591,7 +591,7 @@ function AllowLogonPolicy {
         CheckAllowPolicy -user $user -sid $user
     } 
 }
-#Check if the Allow log on through Remote Desktop Services policy or Allow log on locally for specific user.
+#Check if the Allow log on through Remote Desktop Services policy for specific user.
 function CheckAllowPolicy {
     param (
         $user,
