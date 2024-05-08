@@ -667,6 +667,20 @@ function RDPTCPCheckAndFix {
     
 }
 
+function CheckIfPublished {
+    $init = "$PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
+    if ((Get-RDRemoteApp | select-object -ExpandProperty FilePath) -contains $init) {
+        Write-Host "The PSMInitSession.exe is published as a RemoteApp Program." -ForegroundColor Green
+        return $true
+    }
+    else {
+        Write-Host "The PSMInitSession.exe is not published as a RemoteApp Program." -ForegroundColor Red
+        Write-Host "Link to an article about how to publish PSMInitSession as a RemoteApp Program is on Recommended Articles.txt file." -ForegroundColor Yellow
+        "How to publish PSMInitSession as a RemoteApp Program:`nhttps://cyberark.my.site.com/s/article/Publish-PSMInitSession-as-a-RemoteApp-Program`n" | Out-File $ARTICLES_TEXT_FILE -Append
+        return $false
+    }
+}
+
 #Run compare between brwoser and driver versions.
 function DriverAndBrowserVersion {
     $chromeVersion = CheckBrowserVersion -browser "chrome"
@@ -962,9 +976,16 @@ if ($IsAdmin) {
     Write-Host ""
 
     $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the TSAppAllowList registry keys are not pointing to the correct location for the PSMInitSession.exe." -ForegroundColor Yellow
-    RegistryTSAppAllowList
+    Write-Host "Step $stepsCounter) Checking if PSMInitSession is published as a RemoteApp Program." -ForegroundColor Yellow
+    $isPublished = CheckIfPublished
     Write-Host ""
+
+    if ($isPublished) {
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the TSAppAllowList registry keys are not pointing to the correct location for the PSMInitSession.exe." -ForegroundColor Yellow
+        RegistryTSAppAllowList
+        Write-Host ""
+    }
 
     $stepsCounter++
     Write-Host "Step $stepsCounter) Checking if there is ''Start a program on connection'' GPO applied on the PSM." -ForegroundColor Yellow
@@ -981,6 +1002,7 @@ if ($IsAdmin) {
     Write-Host "Step $stepsCounter) Checking if the registry keys of RDP-TCP isn't configured as needed." -ForegroundColor Yellow
     RDPTCPRegistry
     Write-Host ""
+    
 
     if ($WINDOWS_UPDATES_CHECK) {
         $stepsCounter++
