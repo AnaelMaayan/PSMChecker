@@ -38,8 +38,6 @@
 \
 **$PSM_ADMIN_CONNECT_USER** - PSMAdminConnect username without Domain name.
 \
-**$PSM_COMPONENTS_FOLDER** - Path to the Components folder of the PSM.
-\
 **$WINDOWS_UPDATES_CHECK** - $true to check for pending Windows updates - $false by default.
 \
 **$CHECK_WEB_APPS** - $true to check Web Apps common issues, $false to skip.

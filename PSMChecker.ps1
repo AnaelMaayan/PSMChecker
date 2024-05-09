@@ -25,10 +25,24 @@ $ARTICLES_TEXT_FILE = ".\Recommended Articles - $(Get-Date -Format "dd-MM-yyyy -
 #Global variables for tracking issues and fixes.
 $global:fixcount = 0
 $global:issuescount = 0
+$global:PSM_COMPONENTS_FOLDER
 
 ###########################################################################################
 # Functions
 ###########################################################################################
+
+function ComponentsFolder {
+    $regPath = "HKLM:\SOFTWARE\WOW6432Node\CyberArk\CyberArk Privileged Session Manager"
+    if ((Test-Path $regpath) -eq $true) {
+        $homeDir = (Get-Item (Get-ItemProperty $regpath).'HomeDirectory')
+        $global:PSM_COMPONENTS_FOLDER = "$homeDir\Components"
+        return $true
+    }
+    else {
+        retrun $false
+    }
+    
+}
 
 #Asks if the user willing to fix the identified issue.
 function PromptForConfirmation {
@@ -326,12 +340,12 @@ function PSMinitSession {
     param (
         $user
     )
-    $initsession = "$PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
+    $initsession = "$global:PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
     $program = "TerminalServicesInitialProgram"
     $folder = "TerminalServicesWorkDirectory"
     
     RunPSMInitFix -origin $program -correct $initsession -valuename "Program file name"
-    RunPSMInitFix -origin $folder -correct $PSM_COMPONENTS_FOLDER -valuename "Start in"
+    RunPSMInitFix -origin $folder -correct $global:PSM_COMPONENTS_FOLDER -valuename "Start in"
 }
 
 #Checking and fixing each line on the Environment tab of the user on the AD or the local machine.
@@ -396,13 +410,13 @@ function FolderPermissions {
         $computer = $env:COMPUTERNAME
         $userprop = "$computer\$user"
     }
-    if (CheckPermissions -user $userprop -path $PSM_COMPONENTS_FOLDER) {
+    if (CheckPermissions -user $userprop -path $global:PSM_COMPONENTS_FOLDER) {
         Write-Host "The user $userprop doesn't have the right permissions on the Components folder." -ForegroundColor Red
         $global:issuescount++
         if (PromptForConfirmation) {
             Write-Host "Fixing permissions."
-            PermissionsFix -user $userprop -path $PSM_COMPONENTS_FOLDER
-            if (CheckPermissions -user $userprop -path $PSM_COMPONENTS_FOLDER) {
+            PermissionsFix -user $userprop -path $global:PSM_COMPONENTS_FOLDER
+            if (CheckPermissions -user $userprop -path $global:PSM_COMPONENTS_FOLDER) {
                 Write-Host "The permissions was not granted for user $userprop." -ForegroundColor Red
 
             }
@@ -482,7 +496,7 @@ function NLA {
 
 #Checking and fixing the Path and ShortPath of the PSMInitSession registry key under TSAppAllowList.
 function RegistryTSAppAllowList {
-    $psminitsession = "$PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
+    $psminitsession = "$global:PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
     $key = "Path"
     RegistryPathsFix -CorrectPath $psminitsession -value $key
     $tempObject = New-Object -ComObject Scripting.FileSystemObject 
@@ -668,7 +682,7 @@ function RDPTCPCheckAndFix {
 }
 
 function CheckIfPublished {
-    $init = "$PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
+    $init = "$global:PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
     if ((Get-RDRemoteApp | select-object -ExpandProperty FilePath) -contains $init) {
         Write-Host "The PSMInitSession.exe is published as a RemoteApp Program." -ForegroundColor Green
         return $true
@@ -733,8 +747,8 @@ function CheckDriverVersion {
         $driverName,
         $browserVersion
     )
-    if ((Test-Path "$PSM_COMPONENTS_FOLDER\$driverName") -eq $true) {
-        $versionString = & "$PSM_COMPONENTS_FOLDER\$driverName" --version
+    if ((Test-Path "$global:PSM_COMPONENTS_FOLDER\$driverName") -eq $true) {
+        $versionString = & "$global:PSM_COMPONENTS_FOLDER\$driverName" --version
         #Regular expression to find a version number in the format of x.y.z where x, y, and z are numbers.
         $regexPattern = '\b\d+\.\d+\.\d+\b'
         if ($versionString -match $regexPattern) {
@@ -864,7 +878,7 @@ public static extern bool IsWow64Process(
 #Checks the WebDispatcher version.
 function WebDispatcherVersion {
     
-    $dispatcherVer = (Get-Item "$PSM_COMPONENTS_FOLDER\CyberArk.PSM.WebAppDispatcher.exe").VersionInfo.ProductVersion
+    $dispatcherVer = (Get-Item "$global:PSM_COMPONENTS_FOLDER\CyberArk.PSM.WebAppDispatcher.exe").VersionInfo.ProductVersion
     Write-Host "The Web Dispatcher version is: $dispatcherVer"
     Write-Host "Please update the Dispatcher if there is a newer version."
     Write-Host "Link to the download of the latest Dispatcher is on Recommended Articles.txt file." -ForegroundColor Yellow
@@ -908,7 +922,7 @@ else {
     Write-Host "Connected with Local Administrator:$IsAdmin"  -ForegroundColor Yellow
 }
     
-if ($IsAdmin) {
+if ($IsAdmin -and (ComponentsFolder -eq $true)) {
     $stepsCounter = 0
     write-host ""
     if ($DOMAIN_ACCOUNTS) {
@@ -1044,11 +1058,17 @@ if ($IsAdmin) {
    
 }
 else {
-    if ($DOMAIN_ACCOUNTS) {
-        Write-Host "Need to be connected with Domain Administrator" -ForegroundColor Red
+    if ($IsAdmin -eq $false) {
+        if ($DOMAIN_ACCOUNTS) {
+            Write-Host "Need to be connected with Domain Administrator" -ForegroundColor Red
+        }
+        else {
+            Write-Host "Need to be connected with local Administrator" -ForegroundColor Red    
+        }
     }
-    else {
-        Write-Host "Need to be connected with local Administrator" -ForegroundColor Red    
+    if (ComponentsFolder -eq $false)
+    {
+        Write-Host "The script must run on PSM server." -ForegroundColor Red
     }
 }
 

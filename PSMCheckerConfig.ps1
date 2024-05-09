@@ -37,6 +37,5 @@
 $DOMAIN_ACCOUNTS = $true
 $PSM_CONNECT_USER = "PSMConnect"
 $PSM_ADMIN_CONNECT_USER = "PSMAdminConnect"
-$PSM_COMPONENTS_FOLDER = "C:\Program Files (x86)\CyberArk\PSM\Components"
 $WINDOWS_UPDATES_CHECK = $false
 $CHECK_WEB_APPS = $true
