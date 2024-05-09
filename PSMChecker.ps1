@@ -3,7 +3,7 @@
 #                    -------------------------------
 # General : This script helps identifying and fixing PSM common issues.
 #
-# Version : 1.0.0
+# Version : 1.0
 # Created : April 2024
 # Cyber-Ark Software Ltd.
 # A.M
