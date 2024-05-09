@@ -55,4 +55,4 @@ No modifications are required within the script itself, adjustments are only nee
 [![Logo](https://www.cyberark.com/wp-content/uploads/2022/12/cyberark-logo-v2.svg)](https://www.cyberark.com/)
 
 #
-![version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![version](https://img.shields.io/badge/version-2.0-blue.svg)

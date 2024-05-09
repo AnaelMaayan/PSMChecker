@@ -25,7 +25,7 @@
 #              Change to $true to check Web Apps common issues.
 #              Change to $false to skip the testing Web Apps common issues.            
 #
-# Version : 2.0.0
+# Version : 2.0
 # Created : April 2024
 # Cyber-Ark Software Ltd.
 # A.M
