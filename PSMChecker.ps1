@@ -637,7 +637,7 @@ function CheckAllowPolicy {
     }
 }
 
-#Runs the tests for RDP-TCP registry keys values
+#Runs the tests for RDP-TCP registry keys values.
 function RDPTCPRegistry {
     $regPath = "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp"
     $keys = "fInheritAutoLogon" , "fInheritInitialProgram" , "fQueryUserConfigFromDC" , "fPromptForPassword"
@@ -651,7 +651,7 @@ function RDPTCPRegistry {
     }
 }
 
-#Checking and fixing the RDP-TCP registry keys values
+#Checking and fixing the RDP-TCP registry keys values.
 function RDPTCPCheckAndFix {
     param (
         $regPath,
@@ -681,6 +681,7 @@ function RDPTCPCheckAndFix {
     
 }
 
+#Checking if the PSMInitSession.exe is published as RemoteApp.
 function CheckIfPublished {
     $init = "$global:PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
     if ((Get-RDRemoteApp | select-object -ExpandProperty FilePath) -contains $init) {

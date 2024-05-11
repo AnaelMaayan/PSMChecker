@@ -14,14 +14,11 @@
 #           3) $PSM_ADMIN_CONNECT_USER: 
 #	           Insert the PSMAdminConnect username without Domain name.
 #
-#           4) $PSM_COMPONENTS_FOLDER
-#	           Insert the path to the Components folder of the PSM.
-#
-#           5) $WINDOWS_UPDATES_CHECK
+#           4) $WINDOWS_UPDATES_CHECK
 #              Change to $true to check pending Windows updates.
 #              Change to $false to skip the testing process for pending Windows updates.
 #          
-#           6) $CHECK_WEB_APPS
+#           5) $CHECK_WEB_APPS
 #              Change to $true to check Web Apps common issues.
 #              Change to $false to skip the testing Web Apps common issues.            
 #
