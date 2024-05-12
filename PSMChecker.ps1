@@ -24,11 +24,26 @@ $LOG_FILE = ".\Logs\PSMChecker-$(Get-Date -Format "dd-MM-yyyy - HH-mm").log"
 #Global variables for tracking issues and fixes.
 $global:fixcount = 0
 $global:issuescount = 0
+$global:PSM_COMPONENTS_FOLDER
 
 ###########################################################################################
 # Functions
 ###########################################################################################
 
+#Finding the PSM Components folder. 
+function ComponentsFolder {
+    $regPath = "HKLM:\SOFTWARE\WOW6432Node\CyberArk\CyberArk Privileged Session Manager"
+    if ((Test-Path $regpath) -eq $true) {
+        $homeDir = (Get-Item (Get-ItemProperty $regpath).'HomeDirectory')
+        $global:PSM_COMPONENTS_FOLDER = "$homeDir\Components"
+        return $true
+    }
+    else {
+        retrun $false
+    }   
+}
+
+#Asks if the user willing to fix the identified issue.
 function PromptForConfirmation {
     $input = Read-Host "Would you like to fix the identified issue? Yes/No"
     switch ($input) {
@@ -325,12 +340,12 @@ function PSMinitSession {
     param (
         $user
     )
-    $initsession = "$PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
+    $initsession = "$global:PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
     $program = "TerminalServicesInitialProgram"
     $folder = "TerminalServicesWorkDirectory"
     
     RunPSMInitFix -origin $program -correct $initsession -valuename "Program file name"
-    RunPSMInitFix -origin $folder -correct $PSM_COMPONENTS_FOLDER -valuename "Start in"
+    RunPSMInitFix -origin $folder -correct $global:PSM_COMPONENTS_FOLDER -valuename "Start in"
 }
 
 #Checking and fixing each line on the Environment tab of the user on the AD or the local machine.
@@ -421,8 +436,8 @@ function CheckPermissions {
     param (
         $user
     )
-    $acl1 = (get-acl $PSM_COMPONENTS_FOLDER).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq ReadAndExecute, Synchronize | Where-Object -FilterScript { $_.AccessControlType -eq 'Allow' }
-    $acl2 = (get-acl $PSM_COMPONENTS_FOLDER).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq DeleteSubdirectoriesAndFiles, Write, Delete, ChangePermissions, TakeOwnership | Where-Object -FilterScript { $_.AccessControlType -eq 'Deny' }
+    $acl1 = (get-acl $global:PSM_COMPONENTS_FOLDER).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq ReadAndExecute, Synchronize | Where-Object -FilterScript { $_.AccessControlType -eq 'Allow' }
+    $acl2 = (get-acl $global:PSM_COMPONENTS_FOLDER).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq DeleteSubdirectoriesAndFiles, Write, Delete, ChangePermissions, TakeOwnership | Where-Object -FilterScript { $_.AccessControlType -eq 'Deny' }
     return ($acl1 -eq $null -and $acl2 -eq $null) 
     
 }
@@ -432,20 +447,20 @@ function PermissionsFix {
     param (
         $user
     )
-    $acl = Get-ACL $PSM_COMPONENTS_FOLDER
+    $acl = Get-ACL $global:PSM_COMPONENTS_FOLDER
     $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "FullControl", "ContainerInherit,ObjectInherit", "None", "Deny")
     $acl.RemoveAccessRule($ace)  | Out-Null
-    Set-ACL -Path $PSM_COMPONENTS_FOLDER -AclObject $acl
+    Set-ACL -Path $global:PSM_COMPONENTS_FOLDER -AclObject $acl
     $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
     $acl.RemoveAccessRule($ace)  | Out-Null
-    Set-ACL -Path $PSM_COMPONENTS_FOLDER -AclObject $acl
+    Set-ACL -Path $global:PSM_COMPONENTS_FOLDER -AclObject $acl
     $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "DeleteSubdirectoriesAndFiles,Write,Delete,ChangePermissions,TakeOwnership", "ContainerInherit,ObjectInherit", "None", "Deny")
     $acl.AddAccessRule($ace)
     Set-ACL -Path $PSM_COMPONENTS_FOLDER -AclObject $acl
-    $acl = Get-ACL $PSM_COMPONENTS_FOLDER
+    $acl = Get-ACL $global:PSM_COMPONENTS_FOLDER
     $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "ReadAndExecute, Synchronize , ReadPermissions", "ContainerInherit,ObjectInherit", "None", "Allow")
     $acl.AddAccessRule($ace)
-    Set-ACL -Path $PSM_COMPONENTS_FOLDER -AclObject $acl
+    Set-ACL -Path $global:PSM_COMPONENTS_FOLDER -AclObject $acl
 
     
 }
@@ -479,7 +494,7 @@ function NLA {
 
 #Checking and fixing the Path and ShortPath of the PSMInitSession registry key under TSAppAllowList.
 function RegistryTSAppAllowList {
-    $psminitsession = "$PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
+    $psminitsession = "$global:PSM_COMPONENTS_FOLDER\PSMInitSession.exe"
     $key = "Path"
     RegistryPathsFix -CorrectPath $psminitsession -value $key
     $tempObject = New-Object -ComObject Scripting.FileSystemObject 
@@ -638,7 +653,7 @@ else {
     Write-Host "Connected with Local Administrator:$IsAdmin"  -ForegroundColor Yellow
 }
     
-if ($IsAdmin) {
+if ($IsAdmin -and (ComponentsFolder -eq $true)) {
     $stepsCounter = 0
     write-host ""
     if ($DOMAIN_ACCOUNTS) {
@@ -730,11 +745,17 @@ if ($IsAdmin) {
 
 }
 else {
-    if ($DOMAIN_ACCOUNTS) {
-        Write-Host "Need to be connected with Domain Administrator." -ForegroundColor Red
+    if ($IsAdmin -eq $false) {
+        if ($DOMAIN_ACCOUNTS) {
+            Write-Host "Need to be connected with Domain Administrator" -ForegroundColor Red
+        }
+        else {
+            Write-Host "Need to be connected with local Administrator" -ForegroundColor Red    
+        }
     }
-    else {
-        Write-Host "Need to be connected with local Administrator." -ForegroundColor Red    
+    if (ComponentsFolder -eq $false)
+    {
+        Write-Host "The script must run on PSM server." -ForegroundColor Red
     }
 }
 

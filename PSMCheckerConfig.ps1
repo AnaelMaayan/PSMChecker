@@ -14,10 +14,7 @@
 #           3) $PSM_ADMIN_CONNECT_USER: 
 #	           Insert the PSMAdminConnect username without Domain name.
 #
-#           4) $PSM_COMPONENTS_FOLDER
-#	           Insert the path to the Components folder of the PSM.
-#
-#           5) $WINDOWS_UPDATES_CHECK
+#           4) $WINDOWS_UPDATES_CHECK
 #              Change to $true to check pending Windows updates.
 #              Change to $false to skip the testing process for pending Windows updates.
 #
@@ -33,5 +30,4 @@
 $DOMAIN_ACCOUNTS = $true
 $PSM_CONNECT_USER = "PSMConnect"
 $PSM_ADMIN_CONNECT_USER = "PSMAdminConnect"
-$PSM_COMPONENTS_FOLDER = "C:\Program Files (x86)\CyberArk\PSM\Components"
 $WINDOWS_UPDATES_CHECK = $false

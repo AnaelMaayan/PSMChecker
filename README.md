@@ -28,13 +28,13 @@
 \
 **$PSM_ADMIN_CONNECT_USER** - PSMAdminConnect username without Domain name.
 \
-**$PSM_COMPONENTS_FOLDER** - Path to the Components folder of the PSM.
-\
 **$WINDOWS_UPDATES_CHECK** - $true to check for pending Windows updates - $false by default.
 
 Note - No need to manually input the domain name, the script automatically identifies it.
 \
 No modifications are required within the script itself, adjustments are only needed in the PSMCheckerConfig.ps1 file.
+\
+The tool automatically identifies the installation folder of the PSM.
  
 
 ## Developer
