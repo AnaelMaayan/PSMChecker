@@ -31,6 +31,7 @@ $global:PSM_COMPONENTS_FOLDER
 # Functions
 ###########################################################################################
 
+#Finding the PSM Components folder. 
 function ComponentsFolder {
     $regPath = "HKLM:\SOFTWARE\WOW6432Node\CyberArk\CyberArk Privileged Session Manager"
     if ((Test-Path $regpath) -eq $true) {
