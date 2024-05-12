@@ -40,7 +40,7 @@ function ComponentsFolder {
         return $true
     }
     else {
-        retrun $false
+        return $false
     }
     
 }
@@ -923,8 +923,8 @@ else {
     write-host ""
     Write-Host "Connected with Local Administrator:$IsAdmin"  -ForegroundColor Yellow
 }
-    
-if ($IsAdmin -and (ComponentsFolder -eq $true)) {
+$componentsFolderCheck = ComponentsFolder    
+if ($IsAdmin -and ($componentsFolderCheck-eq $true)) {
     $stepsCounter = 0
     write-host ""
     if ($DOMAIN_ACCOUNTS) {
@@ -1068,7 +1068,7 @@ else {
             Write-Host "Need to be connected with local Administrator" -ForegroundColor Red    
         }
     }
-    if (ComponentsFolder -eq $false)
+    if ($componentsFolderCheck -eq $false)
     {
         Write-Host "The script must run on PSM server." -ForegroundColor Red
     }
