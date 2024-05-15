@@ -1075,8 +1075,8 @@ else {
 }
 
 Write-Host ""
-Write-Host "CyberArk PSMFix script ended successfully." -ForegroundColor Yellow
-Write-Host "The script was able to identify $issuescount issues and fix $fixcount issues." -ForegroundColor Yellow
+Write-Host "CyberArk PSMChecker Tool ended successfully." -ForegroundColor Yellow
+Write-Host "The PSMChecker Tool was able to identify $issuescount issues and fix $fixcount issues." -ForegroundColor Yellow
 
 #Stoping the output to the log file.
 Stop-Transcript  | Out-Null
