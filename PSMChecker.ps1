@@ -63,6 +63,38 @@ function PromptForConfirmation {
     
 }
 
+#Checking connectivity to DC
+function tcpt ([string]$serv, [string]$p) {
+    $result = $false
+    
+    try {
+        $conn = new-object system.net.sockets.tcpclient($serv, $p)
+        if ($conn.connected) { $result = $true } else { result = $false }
+        $conn.close() 
+    } 
+    catch {
+        $result = $false
+    }
+    $conn = $null
+    return $result
+}
+
+#Checking port 9389
+function DCPort {
+    
+    param (
+        $domainname = (gwmi win32_computersystem).domain,
+        $domaincontroller = ((nltest /sc_query:$domainname |  where { $_ -match "Trusted DC Name" }).split("\\") |  where { $_ -match $domainname })
+    )
+    
+    $secureChanneldc = $domaincontroller.trim()
+    
+    $portToCheck = ("9389")
+    
+    $portstat = tcpt $secureChannelDC $portToCheck
+    return $portstat
+}
+
 #Checking if the user account is disabled or locked out on the AD or the local machine.
 function DisabledOrLockedOut {
     param (
@@ -536,7 +568,7 @@ function RegistryPathsFix {
         }
     }
     else {
-        Write-Host "The $value of Path in the registry is correct." -ForegroundColor Green
+        Write-Host "The value of $value in the registry is correct." -ForegroundColor Green
     }
 } 
 
@@ -609,7 +641,7 @@ function AllowLogonPolicy {
         CheckAllowPolicy -user $user -sid $user
     } 
 }
-#Check if the Allow log on through Remote Desktop Services policyfor specific user.
+#Check if the Allow log on through Remote Desktop Services policy for specific user.
 function CheckAllowPolicy {
     param (
         $user,
@@ -909,7 +941,7 @@ function WebAppHardeningFalse {
 #Strating the output to the log file.
 Start-Transcript -Path $LOG_FILE  | Out-Null
 
-#The running process.
+#The running process - Main Function.
 if ($DOMAIN_ACCOUNTS) {
 
     #Installing the Active Directory module for Windows PowerShell.
@@ -917,14 +949,17 @@ if ($DOMAIN_ACCOUNTS) {
     write-host ""
     $IsAdmin = IsUserAdmin
     Write-Host "Connected with Domain Administrator:$IsAdmin"  -ForegroundColor Yellow
+    $openDCPort = DCPort
+    Write-Host "Port 9389 is open to the DC:$openDCPort"  -ForegroundColor Yellow
 }
 else {
     $IsAdmin = IsUserAdmin
     write-host ""
     Write-Host "Connected with Local Administrator:$IsAdmin"  -ForegroundColor Yellow
+    $openDCPort = $true
 }
 $componentsFolderCheck = ComponentsFolder    
-if ($IsAdmin -and ($componentsFolderCheck-eq $true)) {
+if (($IsAdmin -eq $true) -and ($componentsFolderCheck -eq $true) -and ($openDCPort -eq $true)) {
     $stepsCounter = 0
     write-host ""
     if ($DOMAIN_ACCOUNTS) {
@@ -1068,8 +1103,7 @@ else {
             Write-Host "Need to be connected with local Administrator" -ForegroundColor Red    
         }
     }
-    if ($componentsFolderCheck -eq $false)
-    {
+    if ($componentsFolderCheck -eq $false) {
         Write-Host "The script must run on PSM server." -ForegroundColor Red
     }
 }
