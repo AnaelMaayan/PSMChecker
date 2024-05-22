@@ -25,7 +25,7 @@ $ARTICLES_TEXT_FILE = ".\Recommended Articles - $(Get-Date -Format "dd-MM-yyyy -
 #Global variables for tracking issues and fixes.
 $global:fixcount = 0
 $global:issuescount = 0
-$global:PSM_COMPONENTS_FOLDER
+$global:PSM_COMPONENTS_FOLDER = ""
 
 ###########################################################################################
 # Functions
@@ -100,7 +100,7 @@ function DisabledOrLockedOut {
     param (
         $user
     )
-    if ($DOMAIN_ACCOUNTS) {
+    if ($DOMAIN_ACCOUNTS -eq $true) {
         ((Get-ADUser -Identity $user).Enabled -eq $false -or (Get-ADUser -Identity $user -Properties * | Select-Object -ExpandProperty LockedOut) -eq $true)
     }
     else {
@@ -113,7 +113,7 @@ function FixDisabledOrLockedOut {
     param (
         $user
     )
-    if ($DOMAIN_ACCOUNTS) {
+    if ($DOMAIN_ACCOUNTS -eq $true) {
         Unlock-ADAccount -Identity $user
         Enable-ADAccount -Identity $user
     }
@@ -181,7 +181,7 @@ function PasswordChangeRequiredOrNotNeverExpired {
     param (
         $user
     )
-    if ($DOMAIN_ACCOUNTS) {
+    if ($DOMAIN_ACCOUNTS -eq $true) {
         $userProperties = Get-ADUser -Identity $user -Properties pwdLastSet, PasswordNeverExpires
         return ($userProperties.pwdLastSet -eq $true -or $userProperties.PasswordNeverExpires -eq $false)
     }
@@ -197,7 +197,7 @@ function FixChangeOnNextLogon {
     param (
         $user
     )
-    if ($DOMAIN_ACCOUNTS) {
+    if ($DOMAIN_ACCOUNTS -eq $true) {
         Set-ADUser -Identity $user -ChangePasswordAtLogon $false -PasswordNeverExpires $true
     }
     else {
@@ -324,7 +324,7 @@ function RDUGroup {
         $user
     )
     $group = "Remote Desktop Users"
-    if ($DOMAIN_ACCOUNTS) {
+    if ($DOMAIN_ACCOUNTS -eq $true) {
         $domain = $env:USERDOMAIN
         $userprop = "$domain\$user"
     }
@@ -356,7 +356,7 @@ function RDUGroup {
 #Checks if the user that running the script is Domain Administrator or Local Administrator
 function IsUserAdmin {
 
-    if ($DOMAIN_ACCOUNTS) {
+    if ($DOMAIN_ACCOUNTS -eq $true) {
         $principal = New-Object Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
         return $principal.IsInRole("Domain Admins") 
         
@@ -388,7 +388,7 @@ function RunPSMInitFix {
         $correct,
         [string]$valuename
     )
-    if ($DOMAIN_ACCOUNTS) {
+    if ($DOMAIN_ACCOUNTS -eq $true) {
         $dn = (Get-ADUser $user).DistinguishedName 
         $ext = [ADSI]"LDAP://$dn"
     }
@@ -435,7 +435,7 @@ function FolderPermissions {
     param (
         $user
     )
-    if ($DOMAIN_ACCOUNTS -and $user -ne $PSM_SHADOW_USERS_GROUP) {
+    if (($DOMAIN_ACCOUNTS -eq $true) -and $user -ne $PSM_SHADOW_USERS_GROUP) {
         $domain = $env:USERDOMAIN
         $userprop = "$domain\$user"
     }
@@ -633,7 +633,7 @@ function AllowLogonPolicy {
         $user
     )
 
-    if ($DOMAIN_ACCOUNTS -and $user) {
+    if (($DOMAIN_ACCOUNTS -eq $true) -and $user) {
         $userprop = (Get-AdUser -Identity $user | Select SID) -replace '@{SID=', '*' -replace '}', ''
         CheckAllowPolicy -user $user -sid $userprop  
     }
@@ -938,175 +938,213 @@ function WebAppHardeningFalse {
     }
 }
 
+function Menu {
+    Write-Host "`nThank you for running PSMChecker Tool." -ForegroundColor Yellow -BackgroundColor Black
+    Write-Host "1. Check and fix PSM users and Windows related issues." -BackgroundColor Black
+    Write-Host "2. Check and fix Web Apps related issues." -BackgroundColor Black
+    Write-Host "Write ''exit'' to end the tool." -BackgroundColor Black
+    $input = Read-Host "`nPlease choose one of the options" 
+    switch ($input) {
+        '1' { 
+            UsersAndWindowsConfigs
+            Menu
+        }
+        '2' {
+            WebAppsConfigs
+            Menu
+        }
+        'exit' {
+        }
+        Default {
+            Write-Host "You can answer only the number of one of the options." -BackgroundColor Black
+            Menu
+        }
+    }
+    
+}
+#The running process of users and Windows.
+function UsersAndWindowsConfigs {
+    if ($DOMAIN_ACCOUNTS -eq $true) {
+
+        #Installing the Active Directory module for Windows PowerShell.
+        Install-WindowsFeature -Name "RSAT-AD-PowerShell" -IncludeAllSubFeature | Out-Null
+        write-host ""
+        $IsAdmin = IsUserAdmin
+        Write-Host "Connected with Domain Administrator:$IsAdmin"  -ForegroundColor Yellow
+        $openDCPort = DCPort
+        Write-Host "Port 9389 is open to the DC:$openDCPort"  -ForegroundColor Yellow
+    }
+    else {
+        $IsAdmin = IsUserAdmin
+        write-host ""
+        Write-Host "Connected with Local Administrator:$IsAdmin"  -ForegroundColor Yellow
+        $openDCPort = $true
+    }
+    if (($IsAdmin -eq $true) -and ($componentsFolderCheck -eq $true) -and ($openDCPort -eq $true)) {
+        $stepsCounter = 0
+        write-host ""
+        if ($DOMAIN_ACCOUNTS -eq $true) {
+            Write-Host "The configured PSM users are domain users." -ForegroundColor Black -BackgroundColor White
+        }
+        else {
+            Write-Host "The configured PSM users are local users." -ForegroundColor Black -BackgroundColor White
+        }
+        Write-Host "The configured PSMConnect user name is: $PSM_CONNECT_USER." -ForegroundColor Black -BackgroundColor White
+        Write-Host "The configured PSMAdminConnect user name is: $PSM_ADMIN_CONNECT_USER." -ForegroundColor Black -BackgroundColor White
+        Write-Host "The path to the PSM Components folder is: $global:PSM_COMPONENTS_FOLDER" -ForegroundColor Black -BackgroundColor White
+        write-host ""
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the PSM users are locked or disabled." -ForegroundColor Yellow
+        RunDisabledOrLockedOut -user $PSM_CONNECT_USER
+        RunDisabledOrLockedOut -user $PSM_ADMIN_CONNECT_USER
+        Write-Host ""
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the PSM users are set to change password on next logon." -ForegroundColor Yellow
+        ChangeOnNextLogon -user $PSM_CONNECT_USER
+        ChangeOnNextLogon -user $PSM_ADMIN_CONNECT_USER
+        Write-Host ""
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the PSM service is not set to run as Local System user." -ForegroundColor Yellow
+        PSMServiceLocalSystem
+        Write-Host ""
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the PSM service is down." -ForegroundColor Yellow
+        PSMService
+        Write-Host ""
+    
+        if ($DOMAIN_ACCOUNTS -eq $true) {
+            $stepsCounter++
+            Write-Host "Step $stepsCounter) Checking if the PSM users has no ''Log On To'' permissions." -ForegroundColor Yellow
+            LogOnTo -user $PSM_CONNECT_USER
+            LogOnTo -user $PSM_ADMIN_CONNECT_USER
+            Write-Host ""
+        }
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the PSM users are not part of the Remote Desktop Users local group." -ForegroundColor Yellow
+        RDUGroup -user $PSM_CONNECT_USER
+        RDUGroup -user $PSM_ADMIN_CONNECT_USER
+        Write-Host ""
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the  Environment tab isn't configured correctly." -ForegroundColor Yellow
+        PSMinitSession -user $PSM_CONNECT_USER
+        PSMinitSession -user $PSM_ADMIN_CONNECT_USER
+        Write-Host ""
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the PSM users doesn't have permissions on the Components folder." -ForegroundColor Yellow
+        FolderPermissions -user $PSM_CONNECT_USER
+        FolderPermissions -user $PSM_ADMIN_CONNECT_USER
+        FolderPermissions -user $PSM_SHADOW_USERS_GROUP
+        Write-Host ""
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the NLA is enabled on the PSM." -ForegroundColor Yellow
+        NLA
+        Write-Host ""
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if PSMInitSession is published as a RemoteApp Program." -ForegroundColor Yellow
+        $isPublished = CheckIfPublished
+        Write-Host ""
+    
+        if ($isPublished) {
+            $stepsCounter++
+            Write-Host "Step $stepsCounter) Checking if the TSAppAllowList registry keys are not pointing to the correct location for the PSMInitSession.exe." -ForegroundColor Yellow
+            RegistryTSAppAllowList
+            Write-Host ""
+        }
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if there is ''Start a program on connection'' GPO applied on the PSM." -ForegroundColor Yellow
+        CheckGPO
+        Write-Host ""
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the PSM users are not part of the ''Allow log on through Remote Desktop Services'' policy." -ForegroundColor Yellow
+        AllowLogonPolicy -user $PSM_CONNECT_USER
+        AllowLogonPolicy -user $PSM_ADMIN_CONNECT_USER
+        Write-Host ""
+    
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the registry keys of RDP-TCP isn't configured as needed." -ForegroundColor Yellow
+        RDPTCPRegistry
+        Write-Host ""
+        
+    
+        if ($WINDOWS_UPDATES_CHECK) {
+            $stepsCounter++
+            Write-Host "Step $stepsCounter) Checking if the PSM server has pending Windows updates." -ForegroundColor Yellow
+            WindowsUpdates
+            Write-Host ""
+        }
+    }
+    else {
+        if ($IsAdmin -eq $false) {
+            if ($DOMAIN_ACCOUNTS -eq $true) {
+                Write-Host "Need to be connected with Domain Administrator." -ForegroundColor Red
+                if ($openDCPort -eq $false) {
+                    Write-Host "Port 9389 needs to be open to DC." -ForegroundColor Red
+                }
+            }
+        
+            else {
+                Write-Host "Need to be connected with local Administrator." -ForegroundColor Red    
+            }
+        }
+    }   
+}
+
+#The running process for Web Apps.
+function WebAppsConfigs {
+    $stepsCounter = 0
+    Write-Host ""
+    Write-Host "Checking Web Apps issues:" -ForegroundColor Yellow
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) Checking if the Web Driver is not updated." -ForegroundColor Yellow
+    DriverAndBrowserVersion
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) Checking if the UAC is enabled on the PSM." -ForegroundColor Yellow
+    UAC
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) Checking if the installed browser version is 32-bit." -ForegroundColor Yellow
+    Browser64Bit
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) Checking if the Web Dispatcher needs to be updated." -ForegroundColor Yellow
+    WebDispatcherVersion
+    Write-Host ""
+
+    $stepsCounter++
+    Write-Host "Step $stepsCounter) Checking if the Hardening is set to not support Web Apps." -ForegroundColor Yellow
+    WebAppHardeningFalse
+    Write-Host ""
+}
+
 #Strating the output to the log file.
 Start-Transcript -Path $LOG_FILE  | Out-Null
 
 #The running process - Main Function.
-if ($DOMAIN_ACCOUNTS) {
 
-    #Installing the Active Directory module for Windows PowerShell.
-    Install-WindowsFeature -Name "RSAT-AD-PowerShell" -IncludeAllSubFeature | Out-Null
-    write-host ""
-    $IsAdmin = IsUserAdmin
-    Write-Host "Connected with Domain Administrator:$IsAdmin"  -ForegroundColor Yellow
-    $openDCPort = DCPort
-    Write-Host "Port 9389 is open to the DC:$openDCPort"  -ForegroundColor Yellow
+$componentsFolderCheck = ComponentsFolder
+if ($componentsFolderCheck -eq $false) {
+    Write-Host "The script must run on PSM server." -ForegroundColor Red
+    exit
 }
-else {
-    $IsAdmin = IsUserAdmin
-    write-host ""
-    Write-Host "Connected with Local Administrator:$IsAdmin"  -ForegroundColor Yellow
-    $openDCPort = $true
-}
-$componentsFolderCheck = ComponentsFolder    
-if (($IsAdmin -eq $true) -and ($componentsFolderCheck -eq $true) -and ($openDCPort -eq $true)) {
-    $stepsCounter = 0
-    write-host ""
-    if ($DOMAIN_ACCOUNTS) {
-        Write-Host "The configured PSM users are domain users." -ForegroundColor Black -BackgroundColor White
-    }
-    else {
-        Write-Host "The configured PSM users are local users." -ForegroundColor Black -BackgroundColor White
-    }
-    Write-Host "The configured PSMConnect user name is: $PSM_CONNECT_USER." -ForegroundColor Black -BackgroundColor White
-    Write-Host "The configured PSMAdminConnect user name is: $PSM_ADMIN_CONNECT_USER." -ForegroundColor Black -BackgroundColor White
-    write-host ""
 
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the PSM users are locked or disabled." -ForegroundColor Yellow
-    RunDisabledOrLockedOut -user $PSM_CONNECT_USER
-    RunDisabledOrLockedOut -user $PSM_ADMIN_CONNECT_USER
-    Write-Host ""
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the PSM users are set to change password on next logon." -ForegroundColor Yellow
-    ChangeOnNextLogon -user $PSM_CONNECT_USER
-    ChangeOnNextLogon -user $PSM_ADMIN_CONNECT_USER
-    Write-Host ""
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the PSM service is not set to run as Local System user." -ForegroundColor Yellow
-    PSMServiceLocalSystem
-    Write-Host ""
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the PSM service is down." -ForegroundColor Yellow
-    PSMService
-    Write-Host ""
-
-    if ($DOMAIN_ACCOUNTS) {
-        $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the PSM users has no ''Log On To'' permissions." -ForegroundColor Yellow
-        LogOnTo -user $PSM_CONNECT_USER
-        LogOnTo -user $PSM_ADMIN_CONNECT_USER
-        Write-Host ""
-    }
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the PSM users are not part of the Remote Desktop Users local group." -ForegroundColor Yellow
-    RDUGroup -user $PSM_CONNECT_USER
-    RDUGroup -user $PSM_ADMIN_CONNECT_USER
-    Write-Host ""
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the  Environment tab isn't configured correctly." -ForegroundColor Yellow
-    PSMinitSession -user $PSM_CONNECT_USER
-    PSMinitSession -user $PSM_ADMIN_CONNECT_USER
-    Write-Host ""
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the PSM users doesn't have permissions on the Components folder." -ForegroundColor Yellow
-    FolderPermissions -user $PSM_CONNECT_USER
-    FolderPermissions -user $PSM_ADMIN_CONNECT_USER
-    FolderPermissions -user $PSM_SHADOW_USERS_GROUP
-    Write-Host ""
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the NLA is enabled on the PSM." -ForegroundColor Yellow
-    NLA
-    Write-Host ""
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if PSMInitSession is published as a RemoteApp Program." -ForegroundColor Yellow
-    $isPublished = CheckIfPublished
-    Write-Host ""
-
-    if ($isPublished) {
-        $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the TSAppAllowList registry keys are not pointing to the correct location for the PSMInitSession.exe." -ForegroundColor Yellow
-        RegistryTSAppAllowList
-        Write-Host ""
-    }
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if there is ''Start a program on connection'' GPO applied on the PSM." -ForegroundColor Yellow
-    CheckGPO
-    Write-Host ""
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the PSM users are not part of the ''Allow log on through Remote Desktop Services'' policy." -ForegroundColor Yellow
-    AllowLogonPolicy -user $PSM_CONNECT_USER
-    AllowLogonPolicy -user $PSM_ADMIN_CONNECT_USER
-    Write-Host ""
-
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the registry keys of RDP-TCP isn't configured as needed." -ForegroundColor Yellow
-    RDPTCPRegistry
-    Write-Host ""
-    
-
-    if ($WINDOWS_UPDATES_CHECK) {
-        $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the PSM server has pending Windows updates." -ForegroundColor Yellow
-        WindowsUpdates
-        Write-Host ""
-    }
-     
-    if ($CHECK_WEB_APPS) {
-        Write-Host ""
-        Write-Host "Checking Web Apps issues:" -ForegroundColor Yellow
-        Write-Host ""
-
-        $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the Web Driver is not updated." -ForegroundColor Yellow
-        DriverAndBrowserVersion
-        Write-Host ""
-
-        $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the UAC is enabled on the PSM." -ForegroundColor Yellow
-        UAC
-        Write-Host ""
-
-        $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the installed browser version is 32-bit." -ForegroundColor Yellow
-        Browser64Bit
-        Write-Host ""
-
-        $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the Web Dispatcher needs to be updated." -ForegroundColor Yellow
-        WebDispatcherVersion
-        Write-Host ""
-
-        $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the Hardening is set to not support Web Apps." -ForegroundColor Yellow
-        WebAppHardeningFalse
-        Write-Host ""
-    }
-   
-}
-else {
-    if ($IsAdmin -eq $false) {
-        if ($DOMAIN_ACCOUNTS) {
-            Write-Host "Need to be connected with Domain Administrator" -ForegroundColor Red
-        }
-        else {
-            Write-Host "Need to be connected with local Administrator" -ForegroundColor Red    
-        }
-    }
-    if ($componentsFolderCheck -eq $false) {
-        Write-Host "The script must run on PSM server." -ForegroundColor Red
-    }
-}
+Menu
 
 Write-Host ""
 Write-Host "CyberArk PSMChecker Tool ended successfully." -ForegroundColor Yellow
@@ -1127,7 +1165,7 @@ Write-Host "   Object - Enter the object name of the PSMConnect account, as defi
 Write-Host "   AdminObject - Enter the object name of the PSMAdminConnect account, as defined in the Account Name field in the Account Details page in the PVWA." -ForegroundColor White -BackgroundColor Black
 Write-Host ""-ForegroundColor Yellow -BackgroundColor Black
 
-If ($DOMAIN_ACCOUNTS) {
+If ($DOMAIN_ACCOUNTS -eq $true) {
     Write-Host "2) Ensure synchronization of the PSMConnect and PSMAdminConnect passwords with the vault:"-ForegroundColor Yellow -BackgroundColor Black
     Write-Host "   a. Log into the PVWA web interface with an administrator account and copy the PSMConnect password"-ForegroundColor White -BackgroundColor Black
     Write-Host "   b. Using normal Windows processes, reset the PSMConnect password in Active Directory."-ForegroundColor White -BackgroundColor Black
