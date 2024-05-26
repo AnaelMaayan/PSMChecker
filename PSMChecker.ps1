@@ -1153,7 +1153,6 @@ function WebAppsConfigs {
 }
 #The menu of the tool
 function Menu {
-    Write-Host "`nThank you for running PSMChecker Tool." -ForegroundColor Yellow -BackgroundColor Black
     Write-Host "1. Check and fix PSM users and Windows related issues." -BackgroundColor Black
     Write-Host "2. Check and fix Web Apps related issues." -BackgroundColor Black
     Write-Host "Write ''exit'' to end the tool." -BackgroundColor Black
@@ -1161,16 +1160,19 @@ function Menu {
     switch ($input) {
         '1' { 
             UsersAndWindowsConfigs
+            Write-Host ""
             Menu
         }
         '2' {
             WebAppsConfigs
+            Write-Host ""
             Menu
         }
         'exit' {
         }
         Default {
             Write-Host "You can answer only the number of one of the options." -BackgroundColor Black
+            Write-Host ""
             Menu
         }
     }
@@ -1187,6 +1189,7 @@ if ($componentsFolderCheck -eq $false) {
     exit
 }
 
+Write-Host "`nThank you for running PSMChecker Tool." -ForegroundColor Yellow -BackgroundColor Black
 Menu
 
 Write-Host ""
