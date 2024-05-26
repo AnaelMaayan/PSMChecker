@@ -357,9 +357,15 @@ function RDUGroup {
 function IsUserAdmin {
 
     if ($DOMAIN_ACCOUNTS -eq $true) {
-        $principal = New-Object Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
-        return $principal.IsInRole("Domain Admins") 
-        
+        $domainAdmin = $true
+        try {
+            $user = $Env:USERNAME
+            Unlock-AdAccount -Identity $user
+        }
+        catch {
+            $domainAdmin = $false
+        }
+        return $domainAdmin   
     }
     else {
         $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
