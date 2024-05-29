@@ -26,6 +26,7 @@ $ARTICLES_TEXT_FILE = ".\Recommended Articles - $(Get-Date -Format "dd-MM-yyyy -
 $global:fixcount = 0
 $global:issuescount = 0
 $global:PSM_COMPONENTS_FOLDER = ""
+$global:domainAdmin = $true
 
 ###########################################################################################
 # Functions
@@ -131,7 +132,10 @@ function RunDisabledOrLockedOut {
     if ($isDisabledOrLockedOut) {
         Write-Host "User $user is locked out or disabled." -ForegroundColor Red
         $global:issuescount++
-        if (PromptForConfirmation) {
+        if ($global:domainAdmin -eq $false) {
+            Write-Host "To fix the issue you need to run the tool with a Domain Administrator" -ForegroundColor Yellow
+        }
+        elseif (PromptForConfirmation) {
             Write-Host "Fixing user $user."
             FixDisabledOrLockedOut -user $user
             $isDisabledOrLockedOut = DisabledOrLockedOut -user $user
@@ -159,7 +163,10 @@ function ChangeOnNextLogon {
     if (PasswordChangeRequiredOrNotNeverExpired -user $user) {
         Write-Host "User $user is set to change password on next logon." -ForegroundColor Red
         $global:issuescount++
-        if (PromptForConfirmation) {
+        if ($global:domainAdmin -eq $false) {
+            Write-Host "To fix the issue you need to run the tool with a Domain Administrator" -ForegroundColor Yellow
+        }
+        elseif (PromptForConfirmation) {
             Write-Host "Fixing user $user."
             FixChangeOnNextLogon -user $user
             If (PasswordChangeRequiredOrNotNeverExpired -user $user) {
@@ -301,7 +308,10 @@ function LogOnTo {
         if ($allowedComputers -notcontains $computerName) {
             Write-Host "Computer $computerName is not in the list of allowed computers of user $user." -ForegroundColor Red
             $global:issuescount++
-            if (PromptForConfirmation) {
+            if ($global:domainAdmin -eq $false) {
+                Write-Host "To fix the issue you need to run the tool with a Domain Administrator" -ForegroundColor Yellow
+            }
+            elseif (PromptForConfirmation) {
                 $userprop.userWorkstations += ",$computerName"
                 Set-ADUser -Identity $user -Replace @{userWorkstations = $userprop.userWorkstations }
                 Write-Host "Computer $computerName has been added to the list of allowed computers of user $user." -ForegroundColor Green
@@ -357,20 +367,17 @@ function RDUGroup {
 function IsUserAdmin {
 
     if ($DOMAIN_ACCOUNTS -eq $true) {
-        $domainAdmin = $true
         try {
             $user = $Env:USERNAME
             Unlock-AdAccount -Identity $user
         }
         catch {
-            $domainAdmin = $false
+            $global:domainAdmin = $false
         }
-        return $domainAdmin   
     }
-    else {
-        $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-        return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)   
-    }
+    $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)   
+    
 }
 
 
@@ -406,7 +413,10 @@ function RunPSMInitFix {
         $currentvalue = $ext.PSBase.InvokeGet($origin)
         Write-Host "The ''$valuename'' is not configured correctly for the user $user . The current value is: $currentvalue"  -ForegroundColor Red
         $global:issuescount++
-        if (PromptForConfirmation) {
+        if ($global:domainAdmin -eq $false) {
+            Write-Host "To fix the issue you need to run the tool with a Domain Administrator" -ForegroundColor Yellow
+        }
+        elseif (PromptForConfirmation) {
             Write-Host "Fixing the ''$valuename'' value."
             $ext.PSBase.InvokeSet("$origin" , "$correct")
             $ext.SetInfo()
@@ -972,27 +982,27 @@ function CheckIfUserExist {
 #The running process of users and Windows.
 function UsersAndWindowsConfigs {
     $domainAccountsBool
+    $IsAdmin = IsUserAdmin
     if ($DOMAIN_ACCOUNTS -eq $true) {
         $domainAccountsBool = $true
         #Installing the Active Directory module for Windows PowerShell.
         Install-WindowsFeature -Name "RSAT-AD-PowerShell" -IncludeAllSubFeature | Out-Null
-        write-host ""
-        $IsAdmin = IsUserAdmin
-        Write-Host "Connected with Domain Administrator:$IsAdmin"  -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "Connected with Local Administrator:$IsAdmin"  -ForegroundColor Yellow
+        Write-Host "Connected with Domain Administrator:$global:domainAdmin"  -ForegroundColor Yellow
         $openDCPort = DCPort
         Write-Host "Port 9389 is open to the DC:$openDCPort"  -ForegroundColor Yellow
     }
     elseif ($DOMAIN_ACCOUNTS -eq $false) {
         $domainAccountsBool = $true
-        $IsAdmin = IsUserAdmin
-        write-host ""
+        Write-Host ""
         Write-Host "Connected with Local Administrator:$IsAdmin"  -ForegroundColor Yellow
         $openDCPort = $true
     }
     else {
         $domainAccountsBool = $false
     }
-    if (($IsAdmin -eq $true) -and ($openDCPort -eq $true) -and ($domainAccountsBool -eq $true)) {
+    if (($IsAdmin -eq $true) -and ($domainAccountsBool -eq $true)) {
         $stepsCounter = 0
         write-host ""
         if ($DOMAIN_ACCOUNTS -eq $true) {
@@ -1008,18 +1018,37 @@ function UsersAndWindowsConfigs {
         $PSMConnExist = CheckIfUserExist -user $PSM_CONNECT_USER
         $PSMAdmConnExist = CheckIfUserExist -user $PSM_ADMIN_CONNECT_USER
         if (($PSMConnExist -eq $true) -and ($PSMAdmConnExist -eq $true)) {
-            $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if the PSM users are locked or disabled." -ForegroundColor Yellow
-            RunDisabledOrLockedOut -user $PSM_CONNECT_USER
-            RunDisabledOrLockedOut -user $PSM_ADMIN_CONNECT_USER
-            Write-Host ""
+            if (($openDCPort -eq $true) -and ($DOMAIN_ACCOUNTS -eq $true)) {
+                $stepsCounter++
+                Write-Host "Step $stepsCounter) Checking if the PSM users are locked or disabled." -ForegroundColor Yellow
+                RunDisabledOrLockedOut -user $PSM_CONNECT_USER
+                RunDisabledOrLockedOut -user $PSM_ADMIN_CONNECT_USER
+                Write-Host ""
     
-            $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if the PSM users are set to change password on next logon." -ForegroundColor Yellow
-            ChangeOnNextLogon -user $PSM_CONNECT_USER
-            ChangeOnNextLogon -user $PSM_ADMIN_CONNECT_USER
-            Write-Host ""
+                $stepsCounter++
+                Write-Host "Step $stepsCounter) Checking if the PSM users are set to change password on next logon." -ForegroundColor Yellow
+                ChangeOnNextLogon -user $PSM_CONNECT_USER
+                ChangeOnNextLogon -user $PSM_ADMIN_CONNECT_USER
+                Write-Host ""
+
+                $stepsCounter++
+                Write-Host "Step $stepsCounter) Checking if the Environment tab isn't configured correctly." -ForegroundColor Yellow
+                PSMinitSession -user $PSM_CONNECT_USER
+                PSMinitSession -user $PSM_ADMIN_CONNECT_USER
+                Write-Host ""
     
+                if ($DOMAIN_ACCOUNTS -eq $true) {
+                    $stepsCounter++
+                    Write-Host "Step $stepsCounter) Checking if the PSM users has no ''Log On To'' permissions." -ForegroundColor Yellow
+                    LogOnTo -user $PSM_CONNECT_USER
+                    LogOnTo -user $PSM_ADMIN_CONNECT_USER
+                    Write-Host ""
+                }
+            }
+            else {
+                Write-Host "To check and fix the PSM Domain users port 9389 need to be open to the DC." -ForegroundColor Red
+            }
+
             $stepsCounter++
             Write-Host "Step $stepsCounter) Checking if the PSM service is not set to run as Local System user." -ForegroundColor Yellow
             PSMServiceLocalSystem
@@ -1029,25 +1058,11 @@ function UsersAndWindowsConfigs {
             Write-Host "Step $stepsCounter) Checking if the PSM service is down." -ForegroundColor Yellow
             PSMService
             Write-Host ""
-    
-            if ($DOMAIN_ACCOUNTS -eq $true) {
-                $stepsCounter++
-                Write-Host "Step $stepsCounter) Checking if the PSM users has no ''Log On To'' permissions." -ForegroundColor Yellow
-                LogOnTo -user $PSM_CONNECT_USER
-                LogOnTo -user $PSM_ADMIN_CONNECT_USER
-                Write-Host ""
-            }
-    
+            
             $stepsCounter++
             Write-Host "Step $stepsCounter) Checking if the PSM users are not part of the Remote Desktop Users local group." -ForegroundColor Yellow
             RDUGroup -user $PSM_CONNECT_USER
             RDUGroup -user $PSM_ADMIN_CONNECT_USER
-            Write-Host ""
-    
-            $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if the  Environment tab isn't configured correctly." -ForegroundColor Yellow
-            PSMinitSession -user $PSM_CONNECT_USER
-            PSMinitSession -user $PSM_ADMIN_CONNECT_USER
             Write-Host ""
     
             $stepsCounter++
@@ -1101,16 +1116,7 @@ function UsersAndWindowsConfigs {
     }
     else {
         if ($IsAdmin -eq $false) {
-            if ($DOMAIN_ACCOUNTS -eq $true) {
-                Write-Host "Need to be connected with Domain Administrator." -ForegroundColor Red
-                if ($openDCPort -eq $false) {
-                    Write-Host "Port 9389 needs to be open to DC." -ForegroundColor Red
-                }
-            }
-        
-            elseif ($DOMAIN_ACCOUNTS -eq $false) {
-                Write-Host "Need to be connected with local Administrator." -ForegroundColor Red    
-            }
+            Write-Host "Need to be connected with local Administrator." -ForegroundColor Red    
         }
         if ($domainAccountsBool -eq $false) {
             Write-Host "DOMAIN_ACCOUNTS on the PSMCheckerConfig.ps1 needs to be set to $true or $false." -ForegroundColor Red    
@@ -1121,35 +1127,44 @@ function UsersAndWindowsConfigs {
 
 #The running process for Web Apps.
 function WebAppsConfigs {
-    $stepsCounter = 0
+    $IsAdmin = IsUserAdmin
     Write-Host ""
-    Write-Host "Checking Web Apps issues:" -ForegroundColor Yellow
-    Write-Host ""
+    Write-Host "Connected with Local Administrator:$IsAdmin"  -ForegroundColor Yellow
+    if ($IsAdmin -eq $true) {
+        $stepsCounter = 0
+        Write-Host ""
+        Write-Host "Checking Web Apps issues:" -ForegroundColor Yellow
+        Write-Host ""
 
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the Web Driver is not updated." -ForegroundColor Yellow
-    DriverAndBrowserVersion
-    Write-Host ""
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the Web Driver is not updated." -ForegroundColor Yellow
+        DriverAndBrowserVersion
+        Write-Host ""
 
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the UAC is enabled on the PSM." -ForegroundColor Yellow
-    UAC
-    Write-Host ""
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the UAC is enabled on the PSM." -ForegroundColor Yellow
+        UAC
+        Write-Host ""
 
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the installed browser version is 32-bit." -ForegroundColor Yellow
-    Browser64Bit
-    Write-Host ""
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the installed browser version is 32-bit." -ForegroundColor Yellow
+        Browser64Bit
+        Write-Host ""
 
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the Web Dispatcher needs to be updated." -ForegroundColor Yellow
-    WebDispatcherVersion
-    Write-Host ""
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the Web Dispatcher needs to be updated." -ForegroundColor Yellow
+        WebDispatcherVersion
+        Write-Host ""
 
-    $stepsCounter++
-    Write-Host "Step $stepsCounter) Checking if the Hardening is set to not support Web Apps." -ForegroundColor Yellow
-    WebAppHardeningFalse
-    Write-Host ""
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the Hardening is set to not support Web Apps." -ForegroundColor Yellow
+        WebAppHardeningFalse
+        Write-Host ""
+    }
+    else {
+        
+        Write-Host "Need to be connected with local Administrator." -ForegroundColor Red    
+    }
 }
 #The menu of the tool
 function Menu {
