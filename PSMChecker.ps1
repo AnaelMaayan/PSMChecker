@@ -954,6 +954,7 @@ function WebAppHardeningFalse {
     }
 }
 
+#Checking if the PSM users exist.
 function CheckIfUserExist {
     param (
         $user
