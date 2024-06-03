@@ -823,6 +823,9 @@ function CheckDriverVersion {
     }
     else {
         Write-Host "The $driverName is not exist in the PSM Components folder."  -ForegroundColor Red
+        Write-Host "Please download the $driverName driver." -ForegroundColor Red
+        Write-Host "Link to an article about how to download the driver is on Recommended Articles.txt file." -ForegroundColor Yellow
+        "How to download or update browser (Chrome\Edge) driver:`nhttps://cyberark.my.site.com/s/article/How-to-download-or-update-browser-Chrome-Edge-driver`n" | Out-File $ARTICLES_TEXT_FILE -Append
         $global:issuescount++
     }
 }
