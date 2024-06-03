@@ -738,6 +738,7 @@ function CheckIfPublished {
         return $true
     }
     else {
+        $global:issuescount++
         Write-Host "The PSMInitSession.exe is not published as a RemoteApp Program." -ForegroundColor Red
         Write-Host "Link to an article about how to publish PSMInitSession as a RemoteApp Program is on Recommended Articles.txt file." -ForegroundColor Yellow
         "How to publish PSMInitSession as a RemoteApp Program:`nhttps://cyberark.my.site.com/s/article/Publish-PSMInitSession-as-a-RemoteApp-Program`n" | Out-File $ARTICLES_TEXT_FILE -Append
