@@ -1086,7 +1086,7 @@ function UsersAndWindowsConfigs {
             $isPublished = CheckIfPublished
             Write-Host ""
     
-            if ($isPublished) {
+            if ($isPublished -eq $true) {
                 $stepsCounter++
                 Write-Host "Step $stepsCounter) Checking if the TSAppAllowList registry keys are not pointing to the correct location for the PSMInitSession.exe." -ForegroundColor Yellow
                 RegistryTSAppAllowList
