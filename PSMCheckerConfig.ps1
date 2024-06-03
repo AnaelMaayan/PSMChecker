@@ -17,10 +17,7 @@
 #           4) $WINDOWS_UPDATES_CHECK
 #              Change to $true to check pending Windows updates.
 #              Change to $false to skip the testing process for pending Windows updates.
-#          
-#           5) $CHECK_WEB_APPS
-#              Change to $true to check Web Apps common issues.
-#              Change to $false to skip the testing Web Apps common issues.            
+#                 
 #
 # Version : 2.0
 # Created : April 2024
