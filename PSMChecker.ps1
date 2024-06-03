@@ -1025,26 +1025,26 @@ function UsersAndWindowsConfigs {
         if (($PSMConnExist -eq $true) -and ($PSMAdmConnExist -eq $true)) {
             if (($openDCPort -eq $true) -and ($DOMAIN_ACCOUNTS -eq $true)) {
                 $stepsCounter++
-                Write-Host "Step $stepsCounter) Checking if the PSM users are locked or disabled." -ForegroundColor Yellow
+                Write-Host "Step $stepsCounter) Checking if the PSM users are not locked or disabled." -ForegroundColor Yellow
                 RunDisabledOrLockedOut -user $PSM_CONNECT_USER
                 RunDisabledOrLockedOut -user $PSM_ADMIN_CONNECT_USER
                 Write-Host ""
     
                 $stepsCounter++
-                Write-Host "Step $stepsCounter) Checking if the PSM users are set to change password on next logon." -ForegroundColor Yellow
+                Write-Host "Step $stepsCounter) Checking if the PSM users are not set to change password on next logon." -ForegroundColor Yellow
                 ChangeOnNextLogon -user $PSM_CONNECT_USER
                 ChangeOnNextLogon -user $PSM_ADMIN_CONNECT_USER
                 Write-Host ""
 
                 $stepsCounter++
-                Write-Host "Step $stepsCounter) Checking if the Environment tab isn't configured correctly." -ForegroundColor Yellow
+                Write-Host "Step $stepsCounter) Checking if the Environment tab is configured correctly." -ForegroundColor Yellow
                 PSMinitSession -user $PSM_CONNECT_USER
                 PSMinitSession -user $PSM_ADMIN_CONNECT_USER
                 Write-Host ""
     
                 if ($DOMAIN_ACCOUNTS -eq $true) {
                     $stepsCounter++
-                    Write-Host "Step $stepsCounter) Checking if the PSM users has no ''Log On To'' permissions." -ForegroundColor Yellow
+                    Write-Host "Step $stepsCounter) Checking if the PSM users has ''Log On To'' permissions." -ForegroundColor Yellow
                     LogOnTo -user $PSM_CONNECT_USER
                     LogOnTo -user $PSM_ADMIN_CONNECT_USER
                     Write-Host ""
@@ -1055,30 +1055,30 @@ function UsersAndWindowsConfigs {
             }
 
             $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if the PSM service is not set to run as Local System user." -ForegroundColor Yellow
+            Write-Host "Step $stepsCounter) Checking if the PSM service is set to run as Local System user." -ForegroundColor Yellow
             PSMServiceLocalSystem
             Write-Host ""
     
             $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if the PSM service is down." -ForegroundColor Yellow
+            Write-Host "Step $stepsCounter) Checking if the PSM service is running." -ForegroundColor Yellow
             PSMService
             Write-Host ""
             
             $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if the PSM users are not part of the Remote Desktop Users local group." -ForegroundColor Yellow
+            Write-Host "Step $stepsCounter) Checking if the PSM users are  part of the Remote Desktop Users local group." -ForegroundColor Yellow
             RDUGroup -user $PSM_CONNECT_USER
             RDUGroup -user $PSM_ADMIN_CONNECT_USER
             Write-Host ""
     
             $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if the PSM users doesn't have permissions on the Components folder." -ForegroundColor Yellow
+            Write-Host "Step $stepsCounter) Checking if the PSM users have permissions on the Components folder." -ForegroundColor Yellow
             FolderPermissions -user $PSM_CONNECT_USER
             FolderPermissions -user $PSM_ADMIN_CONNECT_USER
             FolderPermissions -user $PSM_SHADOW_USERS_GROUP
             Write-Host ""
     
             $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if the NLA is enabled on the PSM." -ForegroundColor Yellow
+            Write-Host "Step $stepsCounter) Checking if the NLA is disabled on the PSM." -ForegroundColor Yellow
             NLA
             Write-Host ""
     
@@ -1089,24 +1089,24 @@ function UsersAndWindowsConfigs {
     
             if ($isPublished -eq $true) {
                 $stepsCounter++
-                Write-Host "Step $stepsCounter) Checking if the TSAppAllowList registry keys are not pointing to the correct location for the PSMInitSession.exe." -ForegroundColor Yellow
+                Write-Host "Step $stepsCounter) Checking if the TSAppAllowList registry keys point to the correct location for the PSMInitSession.exe." -ForegroundColor Yellow
                 RegistryTSAppAllowList
                 Write-Host ""
             }
     
             $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if there is ''Start a program on connection'' GPO applied on the PSM." -ForegroundColor Yellow
+            Write-Host "Step $stepsCounter) Checking if the ''Start a program on connection'' GPO is not applied on the PSM." -ForegroundColor Yellow
             CheckGPO
             Write-Host ""
     
             $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if the PSM users are not part of the ''Allow log on through Remote Desktop Services'' policy." -ForegroundColor Yellow
+            Write-Host "Step $stepsCounter) Checking if the PSM users are part of the ''Allow log on through Remote Desktop Services'' policy." -ForegroundColor Yellow
             AllowLogonPolicy -user $PSM_CONNECT_USER
             AllowLogonPolicy -user $PSM_ADMIN_CONNECT_USER
             Write-Host ""
     
             $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if the registry keys of RDP-TCP isn't configured as needed." -ForegroundColor Yellow
+            Write-Host "Step $stepsCounter) Checking if the registry keys of RDP-TCP are configured as needed." -ForegroundColor Yellow
             RDPTCPRegistry
             Write-Host ""
         
@@ -1142,12 +1142,12 @@ function WebAppsConfigs {
         Write-Host ""
 
         $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the Web Driver is not updated." -ForegroundColor Yellow
+        Write-Host "Step $stepsCounter) Checking if the Web Driver is updated." -ForegroundColor Yellow
         DriverAndBrowserVersion
         Write-Host ""
 
         $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the UAC is enabled on the PSM." -ForegroundColor Yellow
+        Write-Host "Step $stepsCounter) Checking if the UAC is disabled on the PSM." -ForegroundColor Yellow
         UAC
         Write-Host ""
 
@@ -1157,12 +1157,12 @@ function WebAppsConfigs {
         Write-Host ""
 
         $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the Web Dispatcher needs to be updated." -ForegroundColor Yellow
+        Write-Host "Step $stepsCounter) Checking the Web Dispatcher version." -ForegroundColor Yellow
         WebDispatcherVersion
         Write-Host ""
 
         $stepsCounter++
-        Write-Host "Step $stepsCounter) Checking if the Hardening is set to not support Web Apps." -ForegroundColor Yellow
+        Write-Host "Step $stepsCounter) Checking if the Hardening is set to support Web Apps." -ForegroundColor Yellow
         WebAppHardeningFalse
         Write-Host ""
     }
