@@ -26,7 +26,6 @@ $ARTICLES_TEXT_FILE = ".\Recommended Articles - $(Get-Date -Format "dd-MM-yyyy -
 $global:fixcount = 0
 $global:issuescount = 0
 $global:PSM_COMPONENTS_FOLDER = ""
-$global:domainAdmin = $true
 
 ###########################################################################################
 # Functions
@@ -132,20 +131,25 @@ function RunDisabledOrLockedOut {
     if ($isDisabledOrLockedOut) {
         Write-Host "User $user is locked out or disabled." -ForegroundColor Red
         $global:issuescount++
-        if ($global:domainAdmin -eq $false) {
-            Write-Host "To fix the issue you need to run the tool with a Domain Administrator" -ForegroundColor Yellow
-        }
-        elseif (PromptForConfirmation) {
+        if (PromptForConfirmation) {
             Write-Host "Fixing user $user."
-            FixDisabledOrLockedOut -user $user
-            $isDisabledOrLockedOut = DisabledOrLockedOut -user $user
-            If ($isDisabledOrLockedOut) {
+            try {
+                FixDisabledOrLockedOut -user $user
+                $isDisabledOrLockedOut = DisabledOrLockedOut -user $user
+                If ($isDisabledOrLockedOut) {
+                    Write-Host "User not fixed." -ForegroundColor Red
+                }
+                else {
+                    Write-Host "User fixed." -ForegroundColor Green
+                    $global:fixcount++
+                }
+            }
+            catch {
+                Write-Host "To fix the issue, run the tool with a Domain user account that has Read/Write permissions on the $user user." -ForegroundColor Yellow
                 Write-Host "User not fixed." -ForegroundColor Red
+
             }
-            else {
-                Write-Host "User fixed." -ForegroundColor Green
-                $global:fixcount++
-            }
+            
         }
     }
     else {
@@ -163,18 +167,22 @@ function ChangeOnNextLogon {
     if (PasswordChangeRequiredOrNotNeverExpired -user $user) {
         Write-Host "User $user is set to change password on next logon." -ForegroundColor Red
         $global:issuescount++
-        if ($global:domainAdmin -eq $false) {
-            Write-Host "To fix the issue you need to run the tool with a Domain Administrator" -ForegroundColor Yellow
-        }
-        elseif (PromptForConfirmation) {
-            Write-Host "Fixing user $user."
-            FixChangeOnNextLogon -user $user
-            If (PasswordChangeRequiredOrNotNeverExpired -user $user) {
-                Write-Host "User not fixed." -ForegroundColor Red
+        if (PromptForConfirmation) {
+            try {
+         
+                Write-Host "Fixing user $user."
+                FixChangeOnNextLogon -user $user
+                If (PasswordChangeRequiredOrNotNeverExpired -user $user) {
+                    Write-Host "User not fixed." -ForegroundColor Red
+                }
+                else {
+                    Write-Host "User fixed." -ForegroundColor Green
+                    $global:fixcount++
+                }
             }
-            else {
-                Write-Host "User fixed." -ForegroundColor Green
-                $global:fixcount++
+            catch {
+                Write-Host "To fix the issue, run the tool with a Domain user account that has Read/Write permissions on the $user user." -ForegroundColor Yellow
+                Write-Host "User not fixed." -ForegroundColor Red
             }
         }
     }
@@ -308,14 +316,17 @@ function LogOnTo {
         if ($allowedComputers -notcontains $computerName) {
             Write-Host "Computer $computerName is not in the list of allowed computers of user $user." -ForegroundColor Red
             $global:issuescount++
-            if ($global:domainAdmin -eq $false) {
-                Write-Host "To fix the issue you need to run the tool with a Domain Administrator" -ForegroundColor Yellow
-            }
-            elseif (PromptForConfirmation) {
-                $userprop.userWorkstations += ",$computerName"
-                Set-ADUser -Identity $user -Replace @{userWorkstations = $userprop.userWorkstations }
-                Write-Host "Computer $computerName has been added to the list of allowed computers of user $user." -ForegroundColor Green
-                $global:fixcount++
+            if (PromptForConfirmation) {
+                try {
+                    $userprop.userWorkstations += ",$computerName"
+                    Set-ADUser -Identity $user -Replace @{userWorkstations = $userprop.userWorkstations }
+                    Write-Host "Computer $computerName has been added to the list of allowed computers of user $user." -ForegroundColor Green
+                    $global:fixcount++
+                }
+                catch {
+                    Write-Host "To fix the issue, run the tool with a Domain user account that has Read/Write permissions on the $user user." -ForegroundColor Yellow
+                    Write-Host "Computer $computerName has not been added to the list of allowed computers of user $user." -ForegroundColor Red
+                }
             }
         }
         else {
@@ -366,15 +377,7 @@ function RDUGroup {
 #Checks if the user that running the script is Domain Administrator or Local Administrator
 function IsUserAdmin {
 
-    if ($DOMAIN_ACCOUNTS -eq $true) {
-        try {
-            $user = $Env:USERNAME
-            Unlock-AdAccount -Identity $user
-        }
-        catch {
-            $global:domainAdmin = $false
-        }
-    }
+
     $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)   
     
@@ -413,19 +416,23 @@ function RunPSMInitFix {
         $currentvalue = $ext.PSBase.InvokeGet($origin)
         Write-Host "The ''$valuename'' is not configured correctly for the user $user . The current value is: $currentvalue"  -ForegroundColor Red
         $global:issuescount++
-        if ($global:domainAdmin -eq $false) {
-            Write-Host "To fix the issue you need to run the tool with a Domain Administrator" -ForegroundColor Yellow
-        }
-        elseif (PromptForConfirmation) {
-            Write-Host "Fixing the ''$valuename'' value."
-            $ext.PSBase.InvokeSet("$origin" , "$correct")
-            $ext.SetInfo()
-            if (CheckIfEqualInit -extuse $ext -parm $origin -path $correct) {
-                Write-Host "''$valuename'' value not fixed."  -ForegroundColor Red
+        if (PromptForConfirmation) {
+            try {
+                Write-Host "Fixing the ''$valuename'' value."
+                $ext.PSBase.InvokeSet("$origin" , "$correct")
+                $ext.SetInfo()
+                if (CheckIfEqualInit -extuse $ext -parm $origin -path $correct) {
+                    Write-Host "''$valuename'' value not fixed."  -ForegroundColor Red
+                }
+                else {
+                    $global:fixcount++
+                    Write-Host "''$valuename'' value fixed."  -ForegroundColor Green
+                }
             }
-            else {
-                $global:fixcount++
-                Write-Host "''$valuename'' value fixed."  -ForegroundColor Green
+            catch {
+                Write-Host "To fix the issue, run the tool with a Domain user account that has Read/Write permissions on the $user user." -ForegroundColor Yellow
+                Write-Host "''$valuename'' value not fixed."  -ForegroundColor Red
+
             }
         }
     }
@@ -994,7 +1001,6 @@ function UsersAndWindowsConfigs {
         Install-WindowsFeature -Name "RSAT-AD-PowerShell" -IncludeAllSubFeature | Out-Null
         Write-Host ""
         Write-Host "Connected with Local Administrator:$IsAdmin"  -ForegroundColor Yellow
-        Write-Host "Connected with Domain Administrator:$global:domainAdmin"  -ForegroundColor Yellow
         $openDCPort = DCPort
         Write-Host "Port 9389 is open to the DC:$openDCPort"  -ForegroundColor Yellow
     }
