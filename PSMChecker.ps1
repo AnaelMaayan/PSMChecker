@@ -454,7 +454,7 @@ function CheckIfEqualInit {
 }
 
 #Checking and fixing the Components folder permissions for each PSM user and Shadow Users group.
-function FolderPermissions {
+function ComponentsFolderPermissions {
     param (
         $user
     )
@@ -466,19 +466,19 @@ function FolderPermissions {
         $computer = $env:COMPUTERNAME
         $userprop = "$computer\$user"
     }
-    if (CheckPermissions -user $userprop -path $global:PSM_COMPONENTS_FOLDER) {
+    if (ComponentsCheckPermissions -user $userprop -path $global:PSM_COMPONENTS_FOLDER) {
         Write-Host "The user $userprop doesn't have the right permissions on the Components folder." -ForegroundColor Red
         $global:issuescount++
         if (PromptForConfirmation) {
             Write-Host "Fixing permissions."
-            PermissionsFix -user $userprop -path $global:PSM_COMPONENTS_FOLDER
-            if (CheckPermissions -user $userprop -path $global:PSM_COMPONENTS_FOLDER) {
-                Write-Host "The permissions were not granted for user $userprop." -ForegroundColor Red
+            ComponentsPermissionsFix -user $userprop -path $global:PSM_COMPONENTS_FOLDER
+            if (ComponentsCheckPermissions -user $userprop -path $global:PSM_COMPONENTS_FOLDER) {
+                Write-Host "The permissions were not granted for user $userprop on the Components folder." -ForegroundColor Red
 
             }
             else {
                 $global:fixcount++
-                Write-Host "The right permissions were granted for user $userprop." -ForegroundColor Green            
+                Write-Host "The right permissions were granted for user $userprop  on the Components folder." -ForegroundColor Green            
             }
         }
     }
@@ -487,8 +487,8 @@ function FolderPermissions {
     }
 }
 
-#Checking if the right permissions are granted and denied.
-function CheckPermissions {
+#Checking if the right Components folder permissions are granted and denied.
+function ComponentsCheckPermissions {
     param (
         $user,
         $path
@@ -499,8 +499,8 @@ function CheckPermissions {
     
 }
 
-#Granting and denying the folder permissions.
-function PermissionsFix {
+#Granting and denying the Components folder permissions.
+function ComponentsPermissionsFix {
     param (
         $user,
         $path
@@ -518,10 +518,81 @@ function PermissionsFix {
     $acl = Get-ACL $path
     $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "ReadAndExecute, Synchronize , ReadPermissions", "ContainerInherit,ObjectInherit", "None", "Allow")
     $acl.AddAccessRule($ace)
-    Set-ACL -Path $path -AclObject $acl
-
-    
+    Set-ACL -Path $path -AclObject $acl   
 }
+
+#Checking and fixing the Recordings folder permissions for PSMConnect user and Shadow Users group.
+function RecordingsFolderPermissions {
+    param (
+        $user
+    )
+    $regPath = "HKLM:\SOFTWARE\WOW6432Node\CyberArk\CyberArk Privileged Session Manager"
+    if ((Test-Path $regpath) -eq $true) {
+        $homeDir = (Get-Item (Get-ItemProperty $regpath).'HomeDirectory')
+        $PSMRecordingsFolder = "$homeDir\Recordings"
+    }
+    if (($DOMAIN_ACCOUNTS -eq $true) -and $user -ne $PSM_SHADOW_USERS_GROUP) {
+        $domain = $env:USERDOMAIN
+        $userprop = "$domain\$user"
+    }
+    else {
+        $computer = $env:COMPUTERNAME
+        $userprop = "$computer\$user"
+    }
+    if (RecordingsCheckPermissions -user $userprop -path $PSMRecordingsFolder) {
+        Write-Host "The user $userprop doesn't have the right permissions on the Recordings folder." -ForegroundColor Red
+        $global:issuescount++
+        if (PromptForConfirmation) {
+            Write-Host "Fixing permissions."
+            RecordingsPermissionsFix -user $userprop -path $PSMRecordingsFolder
+            if (RecordingsCheckPermissions -user $userprop -path $PSMRecordingsFolder) {
+                Write-Host "The permissions were not granted for user $userprop on the Recordings folder." -ForegroundColor Red
+
+            }
+            else {
+                $global:fixcount++
+                Write-Host "The right permissions were granted for user $userprop  on the Recordings folder." -ForegroundColor Green            
+            }
+        }
+    }
+    else {
+        Write-Host "The user $userprop already have the right permissions on the Recordings folder." -ForegroundColor Green
+    }
+}
+
+#Checking if the right Recordings folder permissions are granted and denied.
+function RecordingsCheckPermissions {
+    param (
+        $user,
+        $path
+    )
+    $acl1 = (get-acl $path).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq CreateFiles, Synchronize, ReadData | Where-Object -FilterScript { $_.AccessControlType -eq 'Allow' }
+    $acl2 = (get-acl $path).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq AppendData,ReadExtendedAttributes,WriteExtendedAttributes,ExecuteFile,DeleteSubdirectoriesAndFiles,ReadAttributes,WriteAttributes,Delete,ReadPermissions,ChangePermissions,TakeOwnership | Where-Object -FilterScript { $_.AccessControlType -eq 'Deny' }
+    return ($acl1 -eq $null -and $acl2 -eq $null) 
+}
+
+#Granting and denying the Recordings folder permissions.
+function RecordingsPermissionsFix {
+    param (
+        $user,
+        $path
+    )
+    $acl = Get-ACL $path
+    $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "FullControl", "ContainerInherit,ObjectInherit", "None", "Deny")
+    $acl.RemoveAccessRule($ace)  | Out-Null
+    Set-ACL -Path $path -AclObject $acl
+    $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+    $acl.RemoveAccessRule($ace)  | Out-Null
+    Set-ACL -Path $path -AclObject $acl
+    $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "AppendData,ReadExtendedAttributes,WriteExtendedAttributes,ExecuteFile,DeleteSubdirectoriesAndFiles,ReadAttributes,WriteAttributes,Delete,ReadPermissions,ChangePermissions,TakeOwnership", "ContainerInherit,ObjectInherit", "None", "Deny")
+    $acl.AddAccessRule($ace)
+    Set-ACL -Path $path -AclObject $acl
+    $acl = Get-ACL $path
+    $ace = New-Object System.Security.AccessControl.FileSystemAccessRule ($user, "CreateFiles, Synchronize, ReadData", "ObjectInherit", "NoPropagateInherit", "Allow")
+    $acl.AddAccessRule($ace)
+    Set-ACL -Path $path -AclObject $acl   
+}
+
 
 #Checking if NLA is disabled.
 #If not, disabling it.
@@ -1071,16 +1142,22 @@ function UsersAndWindowsConfigs {
             Write-Host ""
             
             $stepsCounter++
-            Write-Host "Step $stepsCounter) Checking if the PSM users are  part of the Remote Desktop Users local group." -ForegroundColor Yellow
+            Write-Host "Step $stepsCounter) Checking if the PSM users are part of the Remote Desktop Users local group." -ForegroundColor Yellow
             RDUGroup -user $PSM_CONNECT_USER
             RDUGroup -user $PSM_ADMIN_CONNECT_USER
             Write-Host ""
     
             $stepsCounter++
             Write-Host "Step $stepsCounter) Checking if the PSM users have permissions on the Components folder." -ForegroundColor Yellow
-            FolderPermissions -user $PSM_CONNECT_USER
-            FolderPermissions -user $PSM_ADMIN_CONNECT_USER
-            FolderPermissions -user $PSM_SHADOW_USERS_GROUP
+            ComponentsFolderPermissions -user $PSM_CONNECT_USER
+            ComponentsFolderPermissions -user $PSM_ADMIN_CONNECT_USER
+            ComponentsFolderPermissions -user $PSM_SHADOW_USERS_GROUP
+            Write-Host ""
+
+            $stepsCounter++
+            Write-Host "Step $stepsCounter) Checking if the PSMConnect and PSM Shadow Users group have permissions on the Recordings folder." -ForegroundColor Yellow
+            RecordingsFolderPermissions -user $PSM_CONNECT_USER
+            RecordingsFolderPermissions -user $PSM_SHADOW_USERS_GROUP
             Write-Host ""
     
             $stepsCounter++
