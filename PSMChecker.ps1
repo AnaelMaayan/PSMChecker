@@ -567,7 +567,7 @@ function RecordingsCheckPermissions {
         $path
     )
     $acl1 = (get-acl $path).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq CreateFiles, Synchronize, ReadData | Where-Object -FilterScript { $_.AccessControlType -eq 'Allow' }
-    $acl2 = (get-acl $path).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq AppendData,ReadExtendedAttributes,WriteExtendedAttributes,ExecuteFile,DeleteSubdirectoriesAndFiles,ReadAttributes,WriteAttributes,Delete,ReadPermissions,ChangePermissions,TakeOwnership | Where-Object -FilterScript { $_.AccessControlType -eq 'Deny' }
+    $acl2 = (get-acl $path).access | Where-Object identityreference -eq $user | Where-Object FileSystemRights -eq AppendData, ReadExtendedAttributes, WriteExtendedAttributes, ExecuteFile, DeleteSubdirectoriesAndFiles, ReadAttributes, WriteAttributes, Delete, ReadPermissions, ChangePermissions, TakeOwnership | Where-Object -FilterScript { $_.AccessControlType -eq 'Deny' }
     return ($acl1 -eq $null -and $acl2 -eq $null) 
 }
 
@@ -1026,7 +1026,7 @@ function WebAppHardeningFalse {
     $userprop = "$computer\$PSM_SHADOW_USERS_GROUP" 
     $IE86 = "C:\Program Files (x86)\Internet Explorer\iexplore.exe"
     $IE64 = "C:\Program Files\internet explorer\iexplore.exe"
-    if ((CheckPermissions -user $userprop -path $IE86) -or (CheckPermissions -user $userprop -path $IE64)) {
+    if ((ComponentsCheckPermissions -user $userprop -path $IE86) -or (ComponentsCheckPermissions -user $userprop -path $IE64)) {
         Write-Host "The value for the SUPPORT_WEB_APPLICATIONS on the Hardening is set to false." -ForegroundColor Red
         Write-Host "Please set the SUPPORT_WEB_APPLICATIONS value to true on the PSMHardening.ps1 script on the Hardening folder and run the Hardening script." -ForegroundColor Red
         $global:issuescount++
@@ -1034,6 +1034,44 @@ function WebAppHardeningFalse {
     else {
         Write-Host "The value for the SUPPORT_WEB_APPLICATIONS on the Hardening is set to true." -ForegroundColor Green
     }
+}
+
+#Checkes if the AppLocker denied Chrome or Edge or the related drivers.
+function WebAppAppLocker {
+    $isBlocked = $false
+    $logPath = "Microsoft-Windows-AppLocker/EXE and DLL"
+    $specificFiles = @("chrome.exe", "chromedriver.exe", "msedge.exe", "msedgedriver.exe")
+    $latestTimestamps = @{}
+    $events = Get-WinEvent -LogName $logPath -ErrorAction SilentlyContinue| Where-Object { $_.Id -eq 8004 }
+
+    foreach ($event in $events) {
+        $message = $event.Message
+        $timestamp = $event.TimeCreated
+        if ($message -match "\\([^\\]+\.exe)\s*was prevented from running\.$") {
+            $fileName = $matches[1]
+            if ($specificFiles -contains $fileName) {
+                if ($timestamp -gt $latestTimestamps[$fileName]) {
+                    $latestTimestamps[$fileName] = $timestamp
+                }
+            }
+        }
+    }
+    foreach ($file in $specificFiles) {
+        $timestamp = $latestTimestamps[$file]
+        if ($timestamp -ne $null) {
+            Write-Host "$file was denied by the AppLocker at $($timestamp.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Red
+            $isBlocked = $true
+
+        }
+    } 
+    if ($isBlocked -eq $true) {
+        Write-Host "Link to to an article with the required rules is on Recommended Articles.txt file." -ForegroundColor Yellow
+        "Applocker rules for Chrome or Edge and the related drivers - Step 4:`nhttps://cyberark.my.site.com/s/article/PSM-WebApp-Connection-Is-Not-Working`n" | Out-File $ARTICLES_TEXT_FILE -Append    
+    }
+    if ($isBlocked -eq $false) {
+        Write-Host "AppLocker didn't deny access to Chrome, Edge, or their associated drivers." -ForegroundColor Green
+    }
+    
 }
 
 #Checking if the PSM users exist.
@@ -1247,6 +1285,11 @@ function WebAppsConfigs {
         $stepsCounter++
         Write-Host "Step $stepsCounter) Checking if the Hardening is set to support Web Apps." -ForegroundColor Yellow
         WebAppHardeningFalse
+        Write-Host ""
+
+        $stepsCounter++
+        Write-Host "Step $stepsCounter) Checking if the AppLocker denied access to Chrome, Edge, or their associated drivers." -ForegroundColor Yellow
+        WebAppAppLocker
         Write-Host ""
     }
     else {
