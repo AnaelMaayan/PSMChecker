@@ -6,7 +6,7 @@
 # Version : 2.0
 # Created : April 2024
 # Cyber-Ark Software Ltd.
-# A.M
+# Anael Maayan
 ########################################################################################################################
 
 ########################################################################################################################
@@ -1088,6 +1088,10 @@ function CheckIfUserExist {
             Write-Host "User $user does not exist in AD." -ForegroundColor Red
             return $false
         }
+        catch [Microsoft.ActiveDirectory.Management.ADServerDownException] {
+            Write-Host "Active Directory Web Services (ADWS) is not running on the DC." -ForegroundColor Red
+            return 1
+        }
     }
     elseif ($DOMAIN_ACCOUNTS -eq $false) {
         if ( ((Get-LocalUser).Name -Contains $user) -eq $true) {
@@ -1136,7 +1140,14 @@ function UsersAndWindowsConfigs {
         Write-Host "The path to the PSM Components folder is: $global:PSM_COMPONENTS_FOLDER" -ForegroundColor Black -BackgroundColor White
         write-host ""
         $PSMConnExist = CheckIfUserExist -user $PSM_CONNECT_USER
-        $PSMAdmConnExist = CheckIfUserExist -user $PSM_ADMIN_CONNECT_USER
+        if($PSMConnExist -ne 1)
+        {
+            $PSMAdmConnExist = CheckIfUserExist -user $PSM_ADMIN_CONNECT_USER
+        }
+        else {
+            $PSMConnExist = $false
+            $PSMAdmConnExist = $false
+        }
         if (($PSMConnExist -eq $true) -and ($PSMAdmConnExist -eq $true)) {
             if (($openDCPort -eq $true) -and ($DOMAIN_ACCOUNTS -eq $true)) {
                 $stepsCounter++
