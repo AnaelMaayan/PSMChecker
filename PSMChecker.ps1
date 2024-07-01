@@ -1138,7 +1138,7 @@ function CheckIfUserExist {
             $searchResult.GetDirectoryEntry()
             return $true
         }
-        catch [Microsoft.ActiveDirectory.Management.ADIdentityResolutionException] {
+        catch{
             Write-Host "User $user not found in AD." -ForegroundColor Red
             return $false
         }
