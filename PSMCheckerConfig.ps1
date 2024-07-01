@@ -1,7 +1,7 @@
 
 ########################################################################################################################
-#                       PSMChecker POWERSHELL SCRIPT
-#                    -------------------------------
+#                            PSMChecker Tool
+#                          --------------------
 # General : This script helps identifying and fixing PSM common issues.
 #           Parameters that may be modified:
 #           1) $DOMAIN_ACCOUNTS: 

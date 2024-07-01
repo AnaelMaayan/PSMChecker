@@ -1,6 +1,6 @@
 ########################################################################################################################
-#                       PSMChecker POWERSHELL SCRIPT
-#                    -------------------------------
+#                            PSMChecker Tool
+#                          --------------------
 # General : This script helps identifying and fixing PSM common issues.
 #
 # Version : 2.0
