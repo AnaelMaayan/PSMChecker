@@ -62,34 +62,6 @@ function PromptForConfirmation {
     
 }
 
-#Checking connectivity to DC
-function tcpt ([string]$serv, [string]$p) {
-    $result = $false
-    
-    try {
-        $conn = new-object system.net.sockets.tcpclient($serv, $p)
-        if ($conn.connected) { $result = $true } else { result = $false }
-        $conn.close() 
-    } 
-    catch {
-        $result = $false
-    }
-    $conn = $null
-    return $result
-}
-
-#Checking port 9389
-function DCPort {
-    
-    param (
-        $domainname = (gwmi win32_computersystem).domain,
-        $domaincontroller = ((nltest /sc_query:$domainname |  where { $_ -match "Trusted DC Name" }).split("\\") |  where { $_ -match $domainname })
-    )
-    $secureChanneldc = $domaincontroller.trim()
-    $portToCheck = ("9389")
-    $portstat = tcpt $secureChannelDC $portToCheck
-    return $portstat
-}
 
 #Checking if the user account is disabled or locked out on the AD or the local machine.
 function DisabledOrLockedOut {
@@ -97,7 +69,21 @@ function DisabledOrLockedOut {
         $user
     )
     if ($DOMAIN_ACCOUNTS -eq $true) {
-        ((Get-ADUser -Identity $user).Enabled -eq $false -or (Get-ADUser -Identity $user -Properties * | Select-Object -ExpandProperty LockedOut) -eq $true)
+        $ldapFilter = "(&(objectCategory=User)(sAMAccountName=$user))"
+        $searcher = New-Object DirectoryServices.DirectorySearcher
+        $searcher.Filter = $ldapFilter
+        $searcher.PropertiesToLoad.Add("userAccountControl")
+        $searchResult = $searcher.FindOne()
+        if ($searchResult -ne $null) {
+            $uac = $searchResult.Properties["useraccountcontrol"][0]
+            $accountEnabled = -not [Convert]::ToBoolean($uac -band 2)
+            $lockoutTime = $searchResult.Properties["lockoutTime"][0]
+            $accountNotLockedOut = $lockoutTime -ne 0
+        }
+        if (($accountEnabled -eq $false) -or ($accountNotLockedOut -eq $false))
+        {
+            return $true
+        }
     }
     else {
         ((Get-LocalUser -Name $user).Enabled -eq $false -or (Get-LocalUser -Name $user).LockoutEnabled -eq $true)
@@ -110,8 +96,21 @@ function FixDisabledOrLockedOut {
         $user
     )
     if ($DOMAIN_ACCOUNTS -eq $true) {
-        Unlock-ADAccount -Identity $user
-        Enable-ADAccount -Identity $user
+        $ldapFilter = "(&(objectCategory=User)(sAMAccountName=$user))"
+        $searcher = New-Object DirectoryServices.DirectorySearcher
+        $searcher.Filter = $ldapFilter
+        $searchResult = $searcher.FindOne()
+        if ($searchResult -ne $null) {
+            $userDN = $searchResult.Properties["distinguishedName"][0]
+            $userEntry = [ADSI]"LDAP://$userDN"
+            $userEntry.Properties["lockoutTime"].Value = 0
+            $userEntry.CommitChanges()
+            $uac = $userEntry.Properties["userAccountControl"][0]
+            $uac = $uac -band (-bnot 2)  #
+            $userEntry.Properties["userAccountControl"].Value = $uac
+            $userEntry.CommitChanges()
+        }
+
     }
     else {
         Enable-LocalUser -Name $user
@@ -193,8 +192,19 @@ function PasswordChangeRequiredOrNotNeverExpired {
         $user
     )
     if ($DOMAIN_ACCOUNTS -eq $true) {
-        $userProperties = Get-ADUser -Identity $user -Properties pwdLastSet, PasswordNeverExpires
-        return ($userProperties.pwdLastSet -eq $true -or $userProperties.PasswordNeverExpires -eq $false)
+        $ldapFilter = "(&(objectCategory=User)(sAMAccountName=$user))"
+        $searcher = New-Object DirectoryServices.DirectorySearcher
+        $searcher.Filter = $ldapFilter
+        $searcher.PropertiesToLoad.Add("pwdLastSet") | Out-Null
+        $searcher.PropertiesToLoad.Add("userAccountControl") | Out-Null
+        $searchResult = $searcher.FindOne()
+        if ($searchResult -ne $null) {
+            $userAccountControl = $searchResult.Properties["userAccountControl"][0]
+            $passwordNeverExpires = [bool]($userAccountControl -band 0x10000)
+            $pwdLastSet = $searchResult.Properties["pwdLastSet"][0]
+            $passwordMustChange = $pwdLastSet -eq 0
+        }
+        return (($passwordMustChange -eq $true) -or ($passwordNeverExpires -eq $false))
     }
     else {
         $userProperties = Get-LocalUser -Name $user
@@ -209,7 +219,18 @@ function FixChangeOnNextLogon {
         $user
     )
     if ($DOMAIN_ACCOUNTS -eq $true) {
-        Set-ADUser -Identity $user -ChangePasswordAtLogon $false -PasswordNeverExpires $true
+        $ldapFilter = "(&(objectCategory=User)(sAMAccountName=$user))"
+        $searcher = New-Object DirectoryServices.DirectorySearcher
+        $searcher.Filter = $ldapFilter
+        $searchResult = $searcher.FindOne()
+        if ($searchResult -ne $null) {
+            $userDN = $searchResult.Properties["distinguishedName"][0]
+            $userEntry = [ADSI]"LDAP://$userDN"
+            $userEntry.Properties["pwdLastSet"].Value = -1
+            $userEntry.Properties["userAccountControl"].Value = $userEntry.Properties["userAccountControl"].Value -bor 0x10000
+            $userEntry.CommitChanges()
+        }
+
     }
     else {
         Net user $user /logonpasswordchg:no  | Out-Null
@@ -301,10 +322,17 @@ function LogOnTo {
     )
 
     $computerName = $env:COMPUTERNAME
-    $userprop = Get-ADUser -Identity $user -Properties userWorkstations
-    if ($userprop.userWorkstations) {
+    $ldapFilter = "(&(objectCategory=User)(sAMAccountName=$user))"
+    $searcher = New-Object DirectoryServices.DirectorySearcher
+    $searcher.Filter = $ldapFilter
+    $searchResult = $searcher.FindOne()
+    if ($searchResult -ne $null) {
+        $userProps = $searchResult.Properties
+        $userWorkstations = $userProps["userWorkstations"]    
+    }
+    if ($userWorkstations -ne "") {
         Write-Host "Allowed computers for user $user :"
-        $allowedComputers = $userprop.userWorkstations -split ','
+        $allowedComputers = $userWorkstations -split ','
         foreach ($allowedComputer in $allowedComputers) {
             Write-Host " - $allowedComputer"
         }
@@ -314,8 +342,17 @@ function LogOnTo {
             $global:issuescount++
             if (PromptForConfirmation) {
                 try {
-                    $userprop.userWorkstations += ",$computerName"
-                    Set-ADUser -Identity $user -Replace @{userWorkstations = $userprop.userWorkstations }
+                    $userWorkstationsFixed = "$userWorkstations,$computerName"
+                    $ldapFilter = "(&(objectCategory=User)(sAMAccountName=$user))"
+                    $searcher = New-Object DirectoryServices.DirectorySearcher
+                    $searcher.Filter = $ldapFilter
+                    $searchResult = $searcher.FindOne()
+                    if ($searchResult -ne $null) {
+                        $dn = $searchResult.Properties["distinguishedName"][0]
+                    }
+                    $userProps = [ADSI]"LDAP://$dn"
+                    $userProps.Properties["userWorkstations"].Value = $userWorkstationsFixed
+                    $userProps.CommitChanges()
                     Write-Host "Computer $computerName added to the list of allowed computers of user $user." -ForegroundColor Green
                     $global:fixcount++
                 }
@@ -401,7 +438,14 @@ function RunPSMInitFix {
         [string]$valuename
     )
     if ($DOMAIN_ACCOUNTS -eq $true) {
-        $dn = (Get-ADUser $user).DistinguishedName 
+        $ldapFilter = "(&(objectCategory=User)(sAMAccountName=$user))"
+        $searcher = New-Object DirectoryServices.DirectorySearcher
+        $searcher.Filter = $ldapFilter
+        $searchResult = $searcher.FindOne()
+        if ($searchResult -ne $null) {
+            $dn = $searchResult.Properties["distinguishedName"][0]
+        }
+
         $ext = [ADSI]"LDAP://$dn"
     }
     else {
@@ -724,8 +768,18 @@ function AllowLogonPolicy {
     )
 
     if (($DOMAIN_ACCOUNTS -eq $true) -and $user) {
-        $userprop = (Get-AdUser -Identity $user | Select SID) -replace '@{SID=', '*' -replace '}', ''
-        CheckAllowPolicy -user $user -sid $userprop  
+        
+        $ldapFilter = "(&(objectCategory=User)(sAMAccountName=$user))"
+        $searcher = New-Object DirectoryServices.DirectorySearcher
+        $searcher.Filter = $ldapFilter
+        $searchResult = $searcher.FindOne()
+        if ($searchResult -ne $null) {
+            $userSID = $searchResult.Properties["objectsid"][0]
+            $userSIDString = (New-Object System.Security.Principal.SecurityIdentifier($userSID, 0)).Value
+
+            $modifiedSID = $userSIDString -replace 'S-', '*S-' -replace '}', ''
+        }
+        CheckAllowPolicy -user $user -sid $modifiedSID  
     }
     else {
         CheckAllowPolicy -user $user -sid $user
@@ -1038,7 +1092,7 @@ function WebAppAppLocker {
     $logPath = "Microsoft-Windows-AppLocker/EXE and DLL"
     $specificFiles = @("chrome.exe", "chromedriver.exe", "msedge.exe", "msedgedriver.exe")
     $latestTimestamps = @{}
-    $events = Get-WinEvent -LogName $logPath -ErrorAction SilentlyContinue| Where-Object { $_.Id -eq 8004 }
+    $events = Get-WinEvent -LogName $logPath -ErrorAction SilentlyContinue | Where-Object { $_.Id -eq 8004 }
 
     foreach ($event in $events) {
         $message = $event.Message
@@ -1077,7 +1131,11 @@ function CheckIfUserExist {
     )
     if ($DOMAIN_ACCOUNTS -eq $true) {
         try {
-            Get-ADUser -Identity $user
+            $ldapFilter = "(&(objectCategory=User)(sAMAccountName=$user))"
+            $searcher = New-Object DirectoryServices.DirectorySearcher
+            $searcher.Filter = $ldapFilter
+            $searchResult = $searcher.FindOne()
+            $searchResult.GetDirectoryEntry()
             return $true
         }
         catch [Microsoft.ActiveDirectory.Management.ADIdentityResolutionException] {
@@ -1106,18 +1164,13 @@ function UsersAndWindowsConfigs {
     $IsAdmin = IsUserAdmin
     if ($DOMAIN_ACCOUNTS -eq $true) {
         $domainAccountsBool = $true
-        #Installing the Active Directory module for Windows PowerShell.
-        Install-WindowsFeature -Name "RSAT-AD-PowerShell" -IncludeAllSubFeature | Out-Null
         Write-Host ""
         Write-Host "Connected with Local Administrator: $IsAdmin"  -ForegroundColor Yellow
-        $openDCPort = DCPort
-        Write-Host "Port 9389 is open to the DC: $openDCPort"  -ForegroundColor Yellow
     }
     elseif ($DOMAIN_ACCOUNTS -eq $false) {
         $domainAccountsBool = $true
         Write-Host ""
         Write-Host "Connected with Local Administrator: $IsAdmin"  -ForegroundColor Yellow
-        $openDCPort = $true
     }
     else {
         $domainAccountsBool = $false
@@ -1136,8 +1189,7 @@ function UsersAndWindowsConfigs {
         Write-Host "PSM Components folder path: $global:PSM_COMPONENTS_FOLDER" -ForegroundColor Black -BackgroundColor White
         write-host ""
         $PSMConnExist = CheckIfUserExist -user $PSM_CONNECT_USER
-        if($PSMConnExist -ne 1)
-        {
+        if ($PSMConnExist -ne 1) {
             $PSMAdmConnExist = CheckIfUserExist -user $PSM_ADMIN_CONNECT_USER
         }
         else {
@@ -1145,35 +1197,31 @@ function UsersAndWindowsConfigs {
             $PSMAdmConnExist = $false
         }
         if (($PSMConnExist -eq $true) -and ($PSMAdmConnExist -eq $true)) {
-            if (($openDCPort -eq $true) -and ($DOMAIN_ACCOUNTS -eq $true)) {
-                $stepsCounter++
-                Write-Host "Step $stepsCounter) Checking if PSM users are not locked or disabled." -ForegroundColor Yellow
-                RunDisabledOrLockedOut -user $PSM_CONNECT_USER
-                RunDisabledOrLockedOut -user $PSM_ADMIN_CONNECT_USER
-                Write-Host ""
+        
+            $stepsCounter++
+            Write-Host "Step $stepsCounter) Checking if PSM users are not locked or disabled." -ForegroundColor Yellow
+            RunDisabledOrLockedOut -user $PSM_CONNECT_USER
+            RunDisabledOrLockedOut -user $PSM_ADMIN_CONNECT_USER
+            Write-Host ""
     
-                $stepsCounter++
-                Write-Host "Step $stepsCounter) Checking if PSM users are not set to change password at next logon." -ForegroundColor Yellow
-                ChangeOnNextLogon -user $PSM_CONNECT_USER
-                ChangeOnNextLogon -user $PSM_ADMIN_CONNECT_USER
-                Write-Host ""
+            $stepsCounter++
+            Write-Host "Step $stepsCounter) Checking if PSM users are not set to change password at next logon." -ForegroundColor Yellow
+            ChangeOnNextLogon -user $PSM_CONNECT_USER
+            ChangeOnNextLogon -user $PSM_ADMIN_CONNECT_USER
+            Write-Host ""
 
-                $stepsCounter++
-                Write-Host "Step $stepsCounter) Checking if Environment tab is configured correctly." -ForegroundColor Yellow
-                PSMinitSession -user $PSM_CONNECT_USER
-                PSMinitSession -user $PSM_ADMIN_CONNECT_USER
-                Write-Host ""
+            $stepsCounter++
+            Write-Host "Step $stepsCounter) Checking if Environment tab is configured correctly." -ForegroundColor Yellow
+            PSMinitSession -user $PSM_CONNECT_USER
+            PSMinitSession -user $PSM_ADMIN_CONNECT_USER
+            Write-Host ""
     
-                if ($DOMAIN_ACCOUNTS -eq $true) {
-                    $stepsCounter++
-                    Write-Host "Step $stepsCounter) Checking if PSM users have ''Log On To'' permissions to the PSM." -ForegroundColor Yellow
-                    LogOnTo -user $PSM_CONNECT_USER
-                    LogOnTo -user $PSM_ADMIN_CONNECT_USER
-                    Write-Host ""
-                }
-            }
-            else {
-                Write-Host "To check and fix PSM Domain users, port 9389 need to be open to the DC." -ForegroundColor Red
+            if ($DOMAIN_ACCOUNTS -eq $true) {
+                $stepsCounter++
+                Write-Host "Step $stepsCounter) Checking if PSM users have ''Log On To'' permissions to the PSM." -ForegroundColor Yellow
+                LogOnTo -user $PSM_CONNECT_USER
+                LogOnTo -user $PSM_ADMIN_CONNECT_USER
+                Write-Host ""
             }
 
             $stepsCounter++
