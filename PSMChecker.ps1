@@ -1142,10 +1142,6 @@ function CheckIfUserExist {
             Write-Host "User $user not found in AD." -ForegroundColor Red
             return $false
         }
-        catch [Microsoft.ActiveDirectory.Management.ADServerDownException] {
-            Write-Host "Active Directory Web Services (ADWS) not running on the DC." -ForegroundColor Red
-            return 1
-        }
     }
     elseif ($DOMAIN_ACCOUNTS -eq $false) {
         if ( ((Get-LocalUser).Name -Contains $user) -eq $true) {
@@ -1189,13 +1185,7 @@ function UsersAndWindowsConfigs {
         Write-Host "PSM Components folder path: $global:PSM_COMPONENTS_FOLDER" -ForegroundColor Black -BackgroundColor White
         write-host ""
         $PSMConnExist = CheckIfUserExist -user $PSM_CONNECT_USER
-        if ($PSMConnExist -ne 1) {
-            $PSMAdmConnExist = CheckIfUserExist -user $PSM_ADMIN_CONNECT_USER
-        }
-        else {
-            $PSMConnExist = $false
-            $PSMAdmConnExist = $false
-        }
+        $PSMAdmConnExist = CheckIfUserExist -user $PSM_ADMIN_CONNECT_USER
         if (($PSMConnExist -eq $true) -and ($PSMAdmConnExist -eq $true)) {
         
             $stepsCounter++
